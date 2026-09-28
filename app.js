@@ -188,7 +188,7 @@ function startTelemetryPolling() {
 
 /* ==================== DUAL-ENGINE TELEMETRY POLLING ==================== */
 
-function clearPrintCache(printerId) {
+function clearPrintCache(printerId, notifyServer = false) {
   const p = STATE.printers[printerId];
   if (!p) return;
   p.state = 'ready';
@@ -203,10 +203,11 @@ function clearPrintCache(printerId) {
     localStorage.removeItem(`nexus_print_${printerId}`);
   } catch(e) {}
 
-  // Flush server telemetry cache so Pantheon does not retain old print data
-  try {
-    fetch('index.php?route=api&action=clear_cache', { method: 'POST' }).catch(() => {});
-  } catch (e) {}
+  if (notifyServer) {
+    try {
+      fetch('index.php?route=api&action=clear_cache', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
+  }
 }
 
 async function pollPrinters() {
@@ -252,11 +253,6 @@ async function pollPrinters() {
         cache: 'no-store'
       });
 
-      if (resp.status === 401 || resp.status === 403) {
-        window.location.href = 'index.php?route=login';
-        return;
-      }
-
       if (resp.ok) {
         const data = await resp.json();
         if (data.status === 'ok' && data.printers && data.printers.p1) {
@@ -291,7 +287,7 @@ function applyMoonrakerStatus(id, status) {
 
     if (st !== 'printing' && st !== 'paused') {
       // Print is complete, cancelled, or standby: CLEAR ALL METRICS!
-      clearPrintCache(id);
+      clearPrintCache(id, false);
     } else {
       p.filename = ps.filename || 'Unknown Print';
       p.filamentUsedMm = parseFloat((ps.filament_used || 0).toFixed(1));
@@ -366,7 +362,7 @@ function handleBridgeTelemetry(bridgePrinters) {
   p1.state = st;
 
   if (st !== 'printing' && st !== 'paused') {
-    clearPrintCache('p1');
+    clearPrintCache('p1', false);
   } else {
     p1.filename = p1Data.filename || 'Unknown Print';
     p1.currentLayer = p1Data.currentLayer || 0;
@@ -398,9 +394,9 @@ function handleBridgeTelemetry(bridgePrinters) {
     Object.assign(STATE.printers.p2, bridgePrinters.p2);
   }
 
-  // If off-network and snapshot URL is present, update camera snapshot
+  // If off-network and snapshot URL is present, update camera snapshot safely
   if (!STATE.isLocalLAN && p1Data.snapshot_url) {
-    loadCloudSnapshot(p1, p1Data.snapshot_url);
+    loadSingleCloudSnapshot(p1Data.snapshot_url);
   }
 }
 
@@ -563,13 +559,13 @@ function switchToCloudSnapshotMode() {
   }
 }
 
-function loadSingleCloudSnapshot() {
+function loadSingleCloudSnapshot(customUrl = null) {
   const img = document.getElementById('cameraStreamImg');
   const fpsBadge = document.getElementById('cameraFpsBadge');
   const standbyOverlay = document.getElementById('cameraStandbyOverlay');
   if (!img) return;
 
-  const snapshotUrl = `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${Date.now()}`;
+  const snapshotUrl = customUrl || `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${Date.now()}`;
   const preloader = new Image();
   preloader.onload = () => {
     img.src = snapshotUrl;
@@ -583,6 +579,11 @@ function loadSingleCloudSnapshot() {
     if (fpsBadge) fpsBadge.textContent = 'STANDBY';
   };
   preloader.src = snapshotUrl;
+}
+
+// Global safety alias
+function loadCloudSnapshot(printerObj, snapshotUrl) {
+  loadSingleCloudSnapshot(snapshotUrl);
 }
 
 function updateLatency(ms) {
@@ -870,7 +871,11 @@ function renderBedVisualizer() {
   bedCtx.strokeStyle = '#334155';
   bedCtx.lineWidth = 2;
   bedCtx.beginPath();
-  bedCtx.roundRect(startX, startY, drawW, drawH, 8);
+  if (typeof bedCtx.roundRect === 'function') {
+    bedCtx.roundRect(startX, startY, drawW, drawH, 8);
+  } else {
+    bedCtx.rect(startX, startY, drawW, drawH);
+  }
   bedCtx.fill();
   bedCtx.stroke();
 
@@ -892,7 +897,7 @@ function renderBedVisualizer() {
     bedCtx.stroke();
   }
 
-  // Draw Printed Part Boundary (qidi-box-ams-snap-base)
+  // Draw Printed Part Boundary
   const partCenterX = 113 * scale;
   const partCenterY = drawH - (112 * scale);
   const partW = 90 * scale;
@@ -902,7 +907,11 @@ function renderBedVisualizer() {
   bedCtx.strokeStyle = 'rgba(0, 242, 254, 0.6)';
   bedCtx.lineWidth = 1.5;
   bedCtx.beginPath();
-  bedCtx.roundRect(startX + partCenterX - (partW/2), startY + partCenterY - (partH/2), partW, partH, 6);
+  if (typeof bedCtx.roundRect === 'function') {
+    bedCtx.roundRect(startX + partCenterX - (partW/2), startY + partCenterY - (partH/2), partW, partH, 6);
+  } else {
+    bedCtx.rect(startX + partCenterX - (partW/2), startY + partCenterY - (partH/2), partW, partH);
+  }
   bedCtx.fill();
   bedCtx.stroke();
 

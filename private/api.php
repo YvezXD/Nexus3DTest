@@ -175,8 +175,19 @@ function handleClearCache() {
     $cleared = 0;
     foreach (glob("$telDir/*.json") as $f) {
         if (basename($f) !== 'manifest.json') {
-            @unlink($f);
-            $cleared++;
+            $data = json_decode(file_get_contents($f), true);
+            if ($data) {
+                $data['state'] = 'ready';
+                $data['filename'] = 'None (Standby)';
+                $data['currentLayer'] = 0;
+                $data['totalLayer'] = 0;
+                $data['progress'] = 0.0;
+                $data['elapsedSeconds'] = 0;
+                $data['totalDurationSeconds'] = 0;
+                $data['filamentUsedMm'] = 0.0;
+                file_put_contents($f, json_encode($data));
+                $cleared++;
+            }
         }
     }
     header('Access-Control-Allow-Origin: *');
