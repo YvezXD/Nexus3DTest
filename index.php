@@ -58,6 +58,9 @@ if (empty($_SESSION['nexus_authenticated'])) {
 $dashFile = __DIR__ . '/dashboard.html';
 if (file_exists($dashFile)) {
     header('Content-Type: text/html; charset=UTF-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     readfile($dashFile);
 } else {
     http_response_code(500);

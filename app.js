@@ -221,53 +221,53 @@ async function pollPrinters() {
     return;
   }
 
-  let directSuccess = false;
+  let synced = false;
 
-  // 1. Direct LAN probe to QIDI Q2 (works instantly on same network, zero latency)
+  // 1. Primary: Query Pantheon Cloud Ingestion endpoint
+  // Works identically on Google Chrome, Edge, Safari, and mobile without Private Network Access or CORS blocks
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1200);
-    const p1 = STATE.printers.p1;
-    const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
-    const resp = await fetch(lanQuery, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const resp = await fetch('index.php?route=api&action=latest', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
 
     if (resp.ok) {
       const data = await resp.json();
-      if (data && data.result && data.result.status) {
-        applyMoonrakerStatus('p1', data.result.status);
-        directSuccess = true;
-        STATE.isLocalLAN = true;
-        updateNetworkBadge(true, `LAN: Direct Link (${p1.ip})`);
+      if (data.status === 'ok' && data.printers && data.printers.p1) {
+        handleBridgeTelemetry(data.printers);
+        synced = true;
       }
     }
-  } catch (lanErr) {
-    directSuccess = false;
+  } catch (cloudErr) {
+    console.warn('Pantheon poll error:', cloudErr);
   }
 
-  // 2. If direct LAN failed or user is off-network, fetch from Pantheon Cloud Ingestion
-  if (!directSuccess) {
+  // 2. Fallback: If not on HTTPS (e.g. running locally) and cloud is not responding, probe Moonraker directly
+  if (!synced && window.location.protocol !== 'https:') {
     try {
-      const resp = await fetch('index.php?route=api&action=latest', {
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store'
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      const p1 = STATE.printers.p1;
+      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
+      const resp = await fetch(lanQuery, { signal: controller.signal });
+      clearTimeout(timeoutId);
 
       if (resp.ok) {
         const data = await resp.json();
-        if (data.status === 'ok' && data.printers && data.printers.p1) {
-          handleBridgeTelemetry(data.printers);
-          STATE.isLocalLAN = false;
-        } else {
-          showBridgeOffline('Awaiting Telemetry: Bridge daemon is syncing...');
+        if (data && data.result && data.result.status) {
+          applyMoonrakerStatus('p1', data.result.status);
+          synced = true;
+          STATE.isLocalLAN = true;
+          updateNetworkBadge(true, `LAN: Direct Link (${p1.ip})`);
         }
-      } else {
-        showBridgeOffline('Bridge Offline: No telemetry from local bridge or LAN.');
       }
-    } catch (cloudErr) {
-      console.warn('Pantheon poll error:', cloudErr);
-      showBridgeOffline('Bridge Offline: Cannot connect to Pantheon telemetry endpoint.');
+    } catch (lanErr) {
+      synced = false;
     }
+  }
+
+  if (!synced) {
+    showBridgeOffline('Bridge Offline: No telemetry from local bridge or LAN.');
   }
 
   STATE.latency = Math.max(12, Math.floor(performance.now() - start));
@@ -529,15 +529,16 @@ function switchToLanStreamMode(forceReload = false) {
 
   const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
 
-  img.onerror = () => {
-    // If direct stream fails (e.g. browser mixed-content or off-network), fall back to Cloud Snapshot
-    console.warn('LAN camera stream failed; switching to Cloud Snapshot fallback.');
-    switchToCloudSnapshotMode();
-  };
-
   img.onload = () => {
     if (fpsBadge) fpsBadge.textContent = 'LAN STREAM';
     if (standbyOverlay) standbyOverlay.style.display = 'none';
+  };
+
+  img.onerror = () => {
+    // If Chrome or Edge blocks mixed-content HTTP stream on HTTPS origin:
+    console.warn('LAN camera stream blocked or unreachable. Falling back to Cloud Snapshot (HTTPS).');
+    STATE.camMode = 'snapshot';
+    switchToCloudSnapshotMode();
   };
 
   if (forceReload || !img.src.includes('action=stream')) {
@@ -547,8 +548,15 @@ function switchToLanStreamMode(forceReload = false) {
 
 function switchToCloudSnapshotMode() {
   const p = STATE.printers[STATE.activePrinterId];
+  const img = document.getElementById('cameraStreamImg');
   const snapLabel = document.getElementById('snapModeLabel');
   if (snapLabel) snapLabel.textContent = 'Snapshot (Cloud)';
+
+  // Detach stream handlers so snapshot image loads never trigger stream callbacks
+  if (img) {
+    img.onerror = null;
+    img.onload = null;
+  }
 
   loadSingleCloudSnapshot();
 

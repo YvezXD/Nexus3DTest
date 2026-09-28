@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.2">
+  <link rel="stylesheet" href="style.css?v=2.3">
 </head>
 <body class="dark-theme">
 
@@ -981,6 +981,65 @@ cors_domains:
 
 
 
-  <script src="app.js?v=2.2"></script>
+  <!-- ==================== CHROME / EDGE INSECURE CONTENT GUIDE MODAL ==================== -->
+  <div class="modal-backdrop" id="chromeGuideModal" style="display: none;">
+    <div class="modal-window card-glass guide-modal-window">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="icon-cyan">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <h2>How to Enable Direct Camera Stream in Google Chrome</h2>
+        </div>
+        <button class="modal-close-btn" id="closeChromeGuideModal">&times;</button>
+      </div>
+
+      <div class="modal-body guide-body">
+        <p class="guide-intro">
+          Because this dashboard is hosted on Pantheon with <strong>HTTPS</strong>, Google Chrome blocks direct local HTTP video streams (<code id="guidePrinterCamUrl">http://192.168.1.124/...</code>) by default under its <em>Insecure Content (Mixed Content)</em> policy.
+        </p>
+
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Click the Tune / Settings Icon in Chrome's Address Bar</h3>
+            <p>At the top left of Google Chrome, directly to the left of the URL <code>https://dev-nexus3-d.pantheonsite.io/</code>, click the <strong>Tune / Padlock icon</strong>.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Open "Site Settings"</h3>
+            <p>Click on <strong>Site settings</strong> from the menu that appears. A new Chrome settings tab will open.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Set "Insecure Content" to ALLOW</h3>
+            <p>Scroll down to the <strong>Insecure content</strong> permission row and change the dropdown from <strong>Block (default)</strong> to <strong>Allow</strong>.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Reload the Dashboard Tab</h3>
+            <p>Return to this dashboard tab and click <strong>Reload</strong>. The live 30 FPS camera feed will immediately play directly inside Chrome!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnGuideOpenPopout">Open Camera in Popout Window</button>
+        <button class="btn-outline" id="btnCloseChromeGuide">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>
