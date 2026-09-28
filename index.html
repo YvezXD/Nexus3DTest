@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.5">
+  <link rel="stylesheet" href="style.css?v=2.6">
 </head>
 <body class="dark-theme">
 
@@ -56,6 +56,21 @@
           <span class="slider round"></span>
         </label>
       </div>
+
+      <button class="nav-btn guide-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <span id="themeBtnLabel">Light Mode</span>
+      </button>
 
       <button class="nav-btn guide-btn" id="openGuideBtn" title="Pantheon Hosting & Network Guide">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -109,8 +124,9 @@
   <main class="main-container">
     
     <!-- Fleet Tabs & View Mode Switcher -->
-    <section class="fleet-tabs-bar">
-      <div class="tabs-list" role="tablist">
+    <section class="fleet-tabs-bar" aria-labelledby="fleetSelectionHeading">
+      <h2 id="fleetSelectionHeading" class="sr-only">Fleet Printers Selection</h2>
+      <div class="tabs-list" role="tablist" aria-label="Printer Selection Tabs">
         <!-- Tab: QIDI Q2 (Primary) -->
         <button class="printer-tab active" id="tabPrinter1" data-printer="p1" role="tab" aria-selected="true">
           <div class="tab-indicator status-printing" id="p1TabDot"></div>
@@ -167,7 +183,8 @@
     </section>
 
     <!-- ==================== DUAL FLEET OVERVIEW CONTAINER ==================== -->
-    <section class="dual-fleet-container" id="dualFleetContainer" style="display: none;">
+    <section class="dual-fleet-container" id="dualFleetContainer" style="display: none;" aria-labelledby="fleetOverviewHeading">
+      <h2 id="fleetOverviewHeading" class="sr-only">Fleet Overview</h2>
       <!-- Fleet Card 1 -->
       <div class="fleet-card card-glass" id="fleetCard1">
         <div class="card-header">
@@ -239,10 +256,11 @@
     </section>
 
     <!-- ==================== DETAILED FOCUS CONTAINER ==================== -->
-    <div class="focus-dashboard-container" id="focusContainer">
+    <div class="focus-dashboard-container" id="focusContainer" aria-labelledby="activePrinterHeading">
+      <h2 id="activePrinterHeading" class="sr-only">Active Printer Dashboard</h2>
 
       <!-- HERO PRINT JOB CARD -->
-      <section class="job-hero-card card-glass" id="jobHeroCard">
+      <section class="job-hero-card card-glass" id="jobHeroCard" aria-labelledby="heroFilename">
         <div class="job-hero-left">
           <div class="job-thumbnail-box">
             <img src="assets/NewPrinterIcon.jpeg" alt="Active Print Job Thumbnail" class="job-thumb" id="heroThumb">
@@ -254,7 +272,7 @@
 
           <div class="job-info-block">
             <div class="job-title-row">
-              <h2 class="job-filename" id="heroFilename" title="qidi-box-ams-snap-base-for-v5.gcode.3mf">qidi-box-ams-snap-base-for-v5.gcode.3mf</h2>
+              <h3 class="job-filename" id="heroFilename" title="qidi-box-ams-snap-base-for-v5.gcode.3mf">qidi-box-ams-snap-base-for-v5.gcode.3mf</h3>
               <span class="badge-state-hero state-printing" id="heroStateBadge">PRINTING</span>
             </div>
             
@@ -320,7 +338,8 @@
       </section>
 
       <!-- TELEMETRY GAUGES ROW -->
-      <section class="telemetry-gauges-row">
+      <section class="telemetry-gauges-row" aria-labelledby="telemetryGaugesHeading">
+        <h3 id="telemetryGaugesHeading" class="sr-only">Thermal and Motion Telemetry</h3>
         <!-- Extruder (Nozzle) Gauge Card -->
         <div class="gauge-card card-glass" id="extruderGaugeCard">
           <div class="gauge-header">
@@ -500,7 +519,8 @@
       </section>
 
       <!-- TWO COLUMN MAIN WORKSPACE (WEBCAM + TEMPERATURE CHART + CONTROLS) -->
-      <section class="workspace-grid">
+      <section class="workspace-grid" aria-labelledby="workspaceControlsHeading">
+        <h3 id="workspaceControlsHeading" class="sr-only">Camera Feed, Axis Motion, and G-Code Terminal</h3>
         
         <!-- LEFT COLUMN: Live Camera / Toolhead Bed View -->
         <div class="column-left">
