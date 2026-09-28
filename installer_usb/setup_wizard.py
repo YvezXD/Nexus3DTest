@@ -115,7 +115,7 @@ def test_pantheon(url, token):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
             "X-API-TOKEN": token,
-            "User-Agent": "Nexus3D-Setup/2.0"
+            "User-Agent": "curl/8.4.0"
         },
         method="POST"
     )

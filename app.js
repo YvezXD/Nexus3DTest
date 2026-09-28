@@ -12,14 +12,9 @@ const STATE = {
   pollTimer: null,
   pollInterval: 2000,
   latency: 18,
-  
-  // History for temperature charts
-  tempHistory: {
-    p1: [],
-    p2: []
-  },
+  isLocalLAN: true,
 
-  camMode: 'stream', // 'stream' or 'snapshot'
+  camMode: 'auto', // 'auto', 'stream', 'snapshot'
   camSnapshotInterval: null,
 
   // Fleet Configs
@@ -34,18 +29,18 @@ const STATE = {
       camStreamUrl: 'http://192.168.1.124/webcam/?action=stream',
       camSnapshotUrl: 'http://192.168.1.124/webcam/?action=snapshot',
       online: true,
-      state: 'printing', // 'printing', 'paused', 'ready', 'standby', 'offline'
-      filename: 'qidi-box-ams-snap-base-for-v5.gcode.3mf',
-      currentLayer: 193,
-      totalLayer: 259,
-      progress: 73.1,
-      elapsedSeconds: 7578,
-      totalDurationSeconds: 10365,
-      filamentUsedMm: 14348.7,
-      extruder: { actual: 259.8, target: 260.0, power: 0.51 },
-      bed: { actual: 100.0, target: 100.0, power: 0.34 },
-      chamber: { actual: 48.2 },
-      toolhead: { x: 49.8, y: 175.0, z: 24.04, maxVel: 600, maxAccel: 10000, fan: 100, speedFactor: 100 }
+      state: 'ready',
+      filename: 'None (Standby)',
+      currentLayer: 0,
+      totalLayer: 0,
+      progress: 0.0,
+      elapsedSeconds: 0,
+      totalDurationSeconds: 0,
+      filamentUsedMm: 0.0,
+      extruder: { actual: 0.0, target: 0.0, power: 0.0 },
+      bed: { actual: 0.0, target: 0.0, power: 0.0 },
+      chamber: { actual: 0.0 },
+      toolhead: { x: 0.0, y: 0.0, z: 0.0, maxVel: 600, maxAccel: 10000, fan: 0, speedFactor: 100 }
     },
     p2: {
       id: 'p2',
@@ -64,10 +59,10 @@ const STATE = {
       progress: 0.0,
       elapsedSeconds: 0,
       totalDurationSeconds: 0,
-      filamentUsedMm: 0,
-      extruder: { actual: 24.2, target: 0.0, power: 0.0 },
-      bed: { actual: 23.8, target: 0.0, power: 0.0 },
-      chamber: { actual: 24.0 },
+      filamentUsedMm: 0.0,
+      extruder: { actual: 0.0, target: 0.0, power: 0.0 },
+      bed: { actual: 0.0, target: 0.0, power: 0.0 },
+      chamber: { actual: 0.0 },
       toolhead: { x: 0.0, y: 0.0, z: 0.0, maxVel: 500, maxAccel: 8000, fan: 0, speedFactor: 100 }
     }
   }
@@ -75,6 +70,10 @@ const STATE = {
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+  try {
+    localStorage.removeItem('nexus_print_p1');
+    localStorage.removeItem('nexus_print_p2');
+  } catch (e) {}
   initTheme();
   loadStoredConfig();
   detectHostingEnvironment();
@@ -187,6 +186,29 @@ function startTelemetryPolling() {
   }, STATE.pollInterval);
 }
 
+/* ==================== DUAL-ENGINE TELEMETRY POLLING ==================== */
+
+function clearPrintCache(printerId) {
+  const p = STATE.printers[printerId];
+  if (!p) return;
+  p.state = 'ready';
+  p.filename = 'None (Standby)';
+  p.currentLayer = 0;
+  p.totalLayer = 0;
+  p.progress = 0.0;
+  p.elapsedSeconds = 0;
+  p.totalDurationSeconds = 0;
+  p.filamentUsedMm = 0.0;
+  try {
+    localStorage.removeItem(`nexus_print_${printerId}`);
+  } catch(e) {}
+
+  // Flush server telemetry cache so Pantheon does not retain old print data
+  try {
+    fetch('index.php?route=api&action=clear_cache', { method: 'POST' }).catch(() => {});
+  } catch (e) {}
+}
+
 async function pollPrinters() {
   const start = performance.now();
 
@@ -198,31 +220,58 @@ async function pollPrinters() {
     return;
   }
 
-  // Poll Pantheon Ingestion API (/index.php?route=api&action=latest)
+  let directSuccess = false;
+
+  // 1. Direct LAN probe to QIDI Q2 (works instantly on same network, zero latency)
   try {
-    const resp = await fetch('index.php?route=api&action=latest', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    const p1 = STATE.printers.p1;
+    const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
+    const resp = await fetch(lanQuery, { signal: controller.signal });
+    clearTimeout(timeoutId);
 
-    if (resp.status === 401 || resp.status === 403) {
-      window.location.href = 'index.php?route=login';
-      return;
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.result && data.result.status) {
+        applyMoonrakerStatus('p1', data.result.status);
+        directSuccess = true;
+        STATE.isLocalLAN = true;
+        updateNetworkBadge(true, `LAN: Direct Link (${p1.ip})`);
+      }
     }
+  } catch (lanErr) {
+    directSuccess = false;
+  }
 
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}`);
-    }
+  // 2. If direct LAN failed or user is off-network, fetch from Pantheon Cloud Ingestion
+  if (!directSuccess) {
+    try {
+      const resp = await fetch('index.php?route=api&action=latest', {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
 
-    const data = await resp.json();
-    if (data.status === 'ok' && data.printers) {
-      handleBridgeTelemetry(data.printers);
-    } else {
-      showBridgeOffline('Awaiting Telemetry: No data received yet from local bridge.');
+      if (resp.status === 401 || resp.status === 403) {
+        window.location.href = 'index.php?route=login';
+        return;
+      }
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.status === 'ok' && data.printers && data.printers.p1) {
+          handleBridgeTelemetry(data.printers);
+          STATE.isLocalLAN = false;
+        } else {
+          showBridgeOffline('Awaiting Telemetry: Bridge daemon is syncing...');
+        }
+      } else {
+        showBridgeOffline('Bridge Offline: No telemetry from local bridge or LAN.');
+      }
+    } catch (cloudErr) {
+      console.warn('Pantheon poll error:', cloudErr);
+      showBridgeOffline('Bridge Offline: Cannot connect to Pantheon telemetry endpoint.');
     }
-  } catch (err) {
-    console.warn('Bridge query error:', err);
-    showBridgeOffline('Bridge Offline: Cannot connect to Pantheon telemetry endpoint.');
   }
 
   STATE.latency = Math.max(12, Math.floor(performance.now() - start));
@@ -230,11 +279,73 @@ async function pollPrinters() {
   renderAll();
 }
 
+function applyMoonrakerStatus(id, status) {
+  const p = STATE.printers[id];
+  if (!p) return;
+  p.online = true;
+
+  if (status.print_stats) {
+    const ps = status.print_stats;
+    const st = (ps.state || 'ready').toLowerCase();
+    p.state = st;
+
+    if (st !== 'printing' && st !== 'paused') {
+      // Print is complete, cancelled, or standby: CLEAR ALL METRICS!
+      clearPrintCache(id);
+    } else {
+      p.filename = ps.filename || 'Unknown Print';
+      p.filamentUsedMm = parseFloat((ps.filament_used || 0).toFixed(1));
+      const dur = ps.print_duration || ps.total_duration || 0;
+      p.elapsedSeconds = Math.round(dur);
+
+      if (ps.info) {
+        p.currentLayer = parseInt(ps.info.current_layer || 0, 10);
+        p.totalLayer = parseInt(ps.info.total_layer || 0, 10);
+      }
+
+      // Sync progress & remaining time matching Fluidd exactly
+      let prog = 0.0;
+      if (status.virtual_sdcard && status.virtual_sdcard.progress !== undefined && status.virtual_sdcard.progress > 0) {
+        prog = status.virtual_sdcard.progress;
+      } else if (status.display_status && status.display_status.progress !== undefined && status.display_status.progress > 0) {
+        prog = status.display_status.progress;
+      } else if (p.totalLayer > 0) {
+        prog = p.currentLayer / p.totalLayer;
+      }
+
+      p.progress = parseFloat((prog * 100).toFixed(1));
+      if (prog > 0 && dur > 0) {
+        p.totalDurationSeconds = Math.round(dur / prog);
+      }
+    }
+  }
+
+  if (status.extruder) {
+    p.extruder.actual = parseFloat(status.extruder.temperature.toFixed(1));
+    p.extruder.target = parseFloat(status.extruder.target.toFixed(1));
+    p.extruder.power = status.extruder.power || 0;
+  }
+  if (status.heater_bed) {
+    p.bed.actual = parseFloat(status.heater_bed.temperature.toFixed(1));
+    p.bed.target = parseFloat(status.heater_bed.target.toFixed(1));
+    p.bed.power = status.heater_bed.power || 0;
+  }
+  if (status.toolhead) {
+    p.toolhead.x = parseFloat(status.toolhead.position[0].toFixed(1));
+    p.toolhead.y = parseFloat(status.toolhead.position[1].toFixed(1));
+    p.toolhead.z = parseFloat(status.toolhead.position[2].toFixed(2));
+    p.toolhead.maxVel = status.toolhead.max_velocity || 600;
+    p.toolhead.maxAccel = status.toolhead.max_accel || 10000;
+  }
+
+  // Dismiss offline alert
+  const banner = document.getElementById('bridgeBanner');
+  if (banner) banner.style.display = 'none';
+}
+
 function handleBridgeTelemetry(bridgePrinters) {
   const p1Data = bridgePrinters.p1;
   const banner = document.getElementById('bridgeBanner');
-  const networkPulse = document.getElementById('networkPulse');
-  const networkLabel = document.getElementById('networkLabel');
 
   if (!p1Data) {
     showBridgeOffline('Bridge Offline: No telemetry from QIDI Q2 (192.168.1.124).');
@@ -242,26 +353,29 @@ function handleBridgeTelemetry(bridgePrinters) {
   }
 
   const age = p1Data._age !== undefined ? p1Data._age : 0;
-  if (age > 15) {
+  if (age > 20) {
     showBridgeOffline(`Bridge Stale: Last telemetry was ${age}s ago.`);
   } else {
-    // Healthy bridge
     if (banner) banner.style.display = 'none';
-    if (networkPulse) networkPulse.className = 'badge-dot pulse-cyan';
-    if (networkLabel) networkLabel.textContent = `Bridge: Online (${age}s)`;
+    updateNetworkBadge(true, `Cloud Bridge: Online (${age}s)`);
   }
 
-  // Sync Printer 1
   const p1 = STATE.printers.p1;
   p1.online = p1Data.online !== false;
-  if (p1Data.state) p1.state = p1Data.state;
-  if (p1Data.filename) p1.filename = p1Data.filename;
-  if (p1Data.currentLayer !== undefined) p1.currentLayer = p1Data.currentLayer;
-  if (p1Data.totalLayer !== undefined) p1.totalLayer = p1Data.totalLayer;
-  if (p1Data.progress !== undefined) p1.progress = p1Data.progress;
-  if (p1Data.elapsedSeconds !== undefined) p1.elapsedSeconds = p1Data.elapsedSeconds;
-  if (p1Data.totalDurationSeconds !== undefined) p1.totalDurationSeconds = p1Data.totalDurationSeconds;
-  if (p1Data.filamentUsedMm !== undefined) p1.filamentUsedMm = p1Data.filamentUsedMm;
+  const st = (p1Data.state || 'ready').toLowerCase();
+  p1.state = st;
+
+  if (st !== 'printing' && st !== 'paused') {
+    clearPrintCache('p1');
+  } else {
+    p1.filename = p1Data.filename || 'Unknown Print';
+    p1.currentLayer = p1Data.currentLayer || 0;
+    p1.totalLayer = p1Data.totalLayer || 0;
+    p1.progress = p1Data.progress !== undefined ? p1Data.progress : 0;
+    p1.elapsedSeconds = p1Data.elapsedSeconds || 0;
+    p1.totalDurationSeconds = p1Data.totalDurationSeconds || 0;
+    p1.filamentUsedMm = p1Data.filamentUsedMm || 0;
+  }
 
   if (p1Data.extruder) {
     p1.extruder.actual = p1Data.extruder.actual ?? p1.extruder.actual;
@@ -280,17 +394,25 @@ function handleBridgeTelemetry(bridgePrinters) {
     Object.assign(p1.toolhead, p1Data.toolhead);
   }
 
-  // Update Printer 2 if present in bridge payload
   if (bridgePrinters.p2) {
     Object.assign(STATE.printers.p2, bridgePrinters.p2);
   }
 
-  // Update snapshot if URL available
-  if (p1Data.snapshot_url) {
-    updateBridgeCamera(p1Data.snapshot_url);
+  // If off-network and snapshot URL is present, update camera snapshot
+  if (!STATE.isLocalLAN && p1Data.snapshot_url) {
+    loadCloudSnapshot(p1, p1Data.snapshot_url);
   }
+}
 
-  recordTempHistory('p1', p1.extruder.actual, p1.extruder.target, p1.bed.actual, p1.bed.target);
+function updateNetworkBadge(isOnline, labelText) {
+  const networkPulse = document.getElementById('networkPulse');
+  const networkLabel = document.getElementById('networkLabel');
+  if (networkPulse) {
+    networkPulse.className = isOnline ? 'badge-dot pulse-cyan' : 'badge-dot pulse-red';
+  }
+  if (networkLabel) {
+    networkLabel.textContent = labelText;
+  }
 }
 
 function showBridgeOffline(msg) {
@@ -337,8 +459,6 @@ function simulateTelemetry(isHardwareFallback = false) {
     p1.toolhead.z = parseFloat((24.0 + (Math.sin(simTick * 0.05) * 0.1)).toFixed(2));
   }
 
-  recordTempHistory('p1', p1.extruder.actual, p1.extruder.target, p1.bed.actual, p1.bed.target);
-
   if (STATE.printers.p2.online) {
     simulatePrinter2();
   }
@@ -346,24 +466,8 @@ function simulateTelemetry(isHardwareFallback = false) {
 
 function simulatePrinter2() {
   const p2 = STATE.printers.p2;
-  // If simulated online in standby or printing
   p2.extruder.actual = parseFloat((24 + Math.sin(simTick * 0.1) * 0.3).toFixed(1));
   p2.bed.actual = parseFloat((23.8 + Math.cos(simTick * 0.1) * 0.2).toFixed(1));
-  recordTempHistory('p2', p2.extruder.actual, p2.extruder.target, p2.bed.actual, p2.bed.target);
-}
-
-function recordTempHistory(printerId, extAct, extTar, bedAct, bedTar) {
-  const hist = STATE.tempHistory[printerId];
-  hist.push({
-    time: Date.now(),
-    extAct,
-    extTar,
-    bedAct,
-    bedTar
-  });
-
-  // Keep last 40 data points
-  if (hist.length > 40) hist.shift();
 }
 
 /* ==================== RENDERING / UI UPDATES ==================== */
@@ -373,40 +477,14 @@ function renderAll() {
   renderTabs();
   renderDualFleet();
   renderFocusView();
-  renderTempChart();
   renderBedVisualizer();
 }
 
-let lastCamFetchTime = 0;
-function updateBridgeCamera(snapshotUrl) {
-  const img = document.getElementById('cameraStreamImg');
-  const standbyOverlay = document.getElementById('cameraStandbyOverlay');
-  const fpsBadge = document.getElementById('cameraFpsBadge');
+/* ==================== HYBRID CAMERA CONTROLLER ==================== */
 
-  if (!img) return;
+let camSnapshotPoller = null;
 
-  const now = Date.now();
-  if (now - lastCamFetchTime < 1000) return;
-  lastCamFetchTime = now;
-
-  const targetUrl = snapshotUrl || `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${now}`;
-
-  const preloader = new Image();
-  preloader.onload = () => {
-    img.src = targetUrl;
-    if (standbyOverlay) standbyOverlay.style.display = 'none';
-    if (fpsBadge) fpsBadge.textContent = 'CLOUD LIVE';
-  };
-  preloader.onerror = () => {
-    if (!img.src.includes('assets/')) {
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
-    }
-    if (fpsBadge) fpsBadge.textContent = 'STANDBY';
-  };
-  preloader.src = targetUrl;
-}
-
-function updateCameraFeed(force = false) {
+function updateCameraFeed(forceReload = false) {
   const p = STATE.printers[STATE.activePrinterId];
   if (!p) return;
 
@@ -417,15 +495,94 @@ function updateCameraFeed(force = false) {
       : `CAM 2: Fleet Slot 2`;
   }
 
+  const img = document.getElementById('cameraStreamImg');
+  const fpsBadge = document.getElementById('cameraFpsBadge');
+  const standbyOverlay = document.getElementById('cameraStandbyOverlay');
+  if (!img) return;
+
   if (STATE.simMode) {
-    const img = document.getElementById('cameraStreamImg');
-    if (img) img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
-    const fpsBadge = document.getElementById('cameraFpsBadge');
+    if (camSnapshotPoller) { clearInterval(camSnapshotPoller); camSnapshotPoller = null; }
+    img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
     if (fpsBadge) fpsBadge.textContent = 'DEMO';
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
     return;
   }
 
-  updateBridgeCamera(p.snapshotUrl);
+  // If user selected explicit snapshot mode OR we are confirmed off-LAN:
+  if (STATE.camMode === 'snapshot' || !STATE.isLocalLAN) {
+    switchToCloudSnapshotMode();
+  } else {
+    switchToLanStreamMode(forceReload);
+  }
+}
+
+function switchToLanStreamMode(forceReload = false) {
+  const p = STATE.printers[STATE.activePrinterId];
+  const img = document.getElementById('cameraStreamImg');
+  const fpsBadge = document.getElementById('cameraFpsBadge');
+  const snapLabel = document.getElementById('snapModeLabel');
+  const standbyOverlay = document.getElementById('cameraStandbyOverlay');
+  if (!img || !p) return;
+
+  if (camSnapshotPoller) {
+    clearInterval(camSnapshotPoller);
+    camSnapshotPoller = null;
+  }
+
+  if (snapLabel) snapLabel.textContent = 'Stream (LAN)';
+
+  const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
+
+  img.onerror = () => {
+    // If direct stream fails (e.g. browser mixed-content or off-network), fall back to Cloud Snapshot
+    console.warn('LAN camera stream failed; switching to Cloud Snapshot fallback.');
+    switchToCloudSnapshotMode();
+  };
+
+  img.onload = () => {
+    if (fpsBadge) fpsBadge.textContent = 'LAN STREAM';
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
+  };
+
+  if (forceReload || !img.src.includes('action=stream')) {
+    img.src = streamUrl;
+  }
+}
+
+function switchToCloudSnapshotMode() {
+  const p = STATE.printers[STATE.activePrinterId];
+  const snapLabel = document.getElementById('snapModeLabel');
+  if (snapLabel) snapLabel.textContent = 'Snapshot (Cloud)';
+
+  loadSingleCloudSnapshot();
+
+  if (!camSnapshotPoller) {
+    camSnapshotPoller = setInterval(() => {
+      loadSingleCloudSnapshot();
+    }, 2000);
+  }
+}
+
+function loadSingleCloudSnapshot() {
+  const img = document.getElementById('cameraStreamImg');
+  const fpsBadge = document.getElementById('cameraFpsBadge');
+  const standbyOverlay = document.getElementById('cameraStandbyOverlay');
+  if (!img) return;
+
+  const snapshotUrl = `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${Date.now()}`;
+  const preloader = new Image();
+  preloader.onload = () => {
+    img.src = snapshotUrl;
+    if (fpsBadge) fpsBadge.textContent = 'CLOUD LIVE';
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
+  };
+  preloader.onerror = () => {
+    if (!img.src || img.src.includes('about:blank')) {
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+    }
+    if (fpsBadge) fpsBadge.textContent = 'STANDBY';
+  };
+  preloader.src = snapshotUrl;
 }
 
 function updateLatency(ms) {
@@ -676,21 +833,11 @@ function padZero(num) {
   return num < 10 ? `0${num}` : `${num}`;
 }
 
-/* ==================== CANVAS CHART & 2D BED VISUALIZER ==================== */
+/* ==================== 2D BED VISUALIZER ==================== */
 
-let tempCtx = null;
 let bedCtx = null;
 
 function initCanvases() {
-  const tempCanvas = document.getElementById('tempCanvas');
-  if (tempCanvas) {
-    // retina scaling
-    tempCanvas.width = tempCanvas.parentElement.clientWidth * 2;
-    tempCanvas.height = 180 * 2;
-    tempCtx = tempCanvas.getContext('2d');
-    tempCtx.scale(2, 2);
-  }
-
   const bedCanvas = document.getElementById('bedCanvas');
   if (bedCanvas) {
     bedCanvas.width = 400 * 2;
@@ -698,109 +845,6 @@ function initCanvases() {
     bedCtx = bedCanvas.getContext('2d');
     bedCtx.scale(2, 2);
   }
-}
-
-function renderTempChart() {
-  if (!tempCtx) return;
-  const canvas = tempCtx.canvas;
-  const width = canvas.width / 2;
-  const height = canvas.height / 2;
-
-  // Clear
-  tempCtx.clearRect(0, 0, width, height);
-
-  const hist = STATE.tempHistory[STATE.activePrinterId] || [];
-  if (hist.length < 2) {
-    tempCtx.fillStyle = '#64748b';
-    tempCtx.font = '12px "JetBrains Mono", monospace';
-    tempCtx.textAlign = 'center';
-    tempCtx.fillText('Gathering telemetry data points...', width / 2, height / 2);
-    return;
-  }
-
-  // Draw grid lines
-  tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-  tempCtx.lineWidth = 1;
-  const gridSteps = 4;
-  for (let i = 0; i <= gridSteps; i++) {
-    const y = (height / gridSteps) * i;
-    tempCtx.beginPath();
-    tempCtx.moveTo(35, y);
-    tempCtx.lineTo(width - 10, y);
-    tempCtx.stroke();
-
-    // Temp labels: 0°C to 300°C
-    const tempVal = Math.round(300 - (i * (300 / gridSteps)));
-    tempCtx.fillStyle = '#475569';
-    tempCtx.font = '9px "JetBrains Mono", monospace';
-    tempCtx.textAlign = 'right';
-    tempCtx.fillText(`${tempVal}°C`, 30, y + 3);
-  }
-
-  const plotW = width - 45;
-  const plotH = height - 20;
-  const maxTemp = 300;
-
-  function getY(temp) {
-    const ratio = Math.min(1, Math.max(0, temp / maxTemp));
-    return (height - 10) - (ratio * plotH);
-  }
-
-  function getX(idx, total) {
-    return 40 + (idx / (total - 1)) * plotW;
-  }
-
-  // 1. Draw Extruder Target (dashed cyan)
-  tempCtx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
-  tempCtx.lineWidth = 1.5;
-  tempCtx.setLineDash([4, 4]);
-  tempCtx.beginPath();
-  hist.forEach((pt, idx) => {
-    const x = getX(idx, hist.length);
-    const y = getY(pt.extTar);
-    if (idx === 0) tempCtx.moveTo(x, y);
-    else tempCtx.lineTo(x, y);
-  });
-  tempCtx.stroke();
-
-  // 2. Draw Bed Target (dashed amber)
-  tempCtx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
-  tempCtx.beginPath();
-  hist.forEach((pt, idx) => {
-    const x = getX(idx, hist.length);
-    const y = getY(pt.bedTar);
-    if (idx === 0) tempCtx.moveTo(x, y);
-    else tempCtx.lineTo(x, y);
-  });
-  tempCtx.stroke();
-  tempCtx.setLineDash([]); // Reset dash
-
-  // 3. Draw Bed Actual (Amber solid)
-  tempCtx.strokeStyle = '#f59e0b';
-  tempCtx.lineWidth = 2;
-  tempCtx.beginPath();
-  hist.forEach((pt, idx) => {
-    const x = getX(idx, hist.length);
-    const y = getY(pt.bedAct);
-    if (idx === 0) tempCtx.moveTo(x, y);
-    else tempCtx.lineTo(x, y);
-  });
-  tempCtx.stroke();
-
-  // 4. Draw Extruder Actual (Cyan solid + glow)
-  tempCtx.strokeStyle = '#00f2fe';
-  tempCtx.lineWidth = 2.5;
-  tempCtx.shadowColor = 'rgba(0, 242, 254, 0.5)';
-  tempCtx.shadowBlur = 8;
-  tempCtx.beginPath();
-  hist.forEach((pt, idx) => {
-    const x = getX(idx, hist.length);
-    const y = getY(pt.extAct);
-    if (idx === 0) tempCtx.moveTo(x, y);
-    else tempCtx.lineTo(x, y);
-  });
-  tempCtx.stroke();
-  tempCtx.shadowBlur = 0; // reset
 }
 
 function renderBedVisualizer() {
@@ -1009,8 +1053,11 @@ function initEventListeners() {
   // Camera Actions
   const openPopoutCam = () => {
     const p = STATE.printers[STATE.activePrinterId];
-    const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
-    window.open(streamUrl, '3DPrinterCamera', 'width=700,height=530,resizable=yes,scrollbars=no');
+    let target = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
+    if (!STATE.isLocalLAN) {
+      target = `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${Date.now()}`;
+    }
+    window.open(target, '3DPrinterCamera', 'width=700,height=530,resizable=yes,scrollbars=no');
     logTerminal(`Opened camera popout window for ${p.name}`, 'info');
   };
 
@@ -1021,16 +1068,16 @@ function initEventListeners() {
     document.getElementById('chromeGuideModal').style.display = 'none';
   });
 
-  // Toggle Snapshot Mode
+  // Toggle Snapshot / Stream Mode
   const toggleSnap = () => {
     STATE.camMode = (STATE.camMode === 'stream') ? 'snapshot' : 'stream';
-    logTerminal(`Camera mode switched to ${STATE.camMode.toUpperCase()}`, 'info');
-    updateCameraFeed();
+    logTerminal(`Camera mode switched to ${STATE.camMode === 'stream' ? 'LAN STREAM' : 'CLOUD SNAPSHOT'}`, 'info');
+    updateCameraFeed(true);
   };
   document.getElementById('btnToggleSnapMode')?.addEventListener('click', toggleSnap);
   document.getElementById('btnBlockedSnapshot')?.addEventListener('click', () => {
     STATE.camMode = 'snapshot';
-    updateCameraFeed();
+    updateCameraFeed(true);
   });
 
   // Mixed content Chrome / Edge guide modal
@@ -1051,9 +1098,14 @@ function initEventListeners() {
   document.getElementById('btnSnapCam')?.addEventListener('click', () => {
     const img = document.getElementById('cameraStreamImg');
     const p = STATE.printers[STATE.activePrinterId];
-    if (img && p.camSnapshotUrl) {
-      img.src = `${p.camSnapshotUrl}?t=${Date.now()}`;
-      logTerminal(`Captured fresh snapshot from ${p.name}.`, 'info');
+    if (!img || !p) return;
+    if (STATE.isLocalLAN && p.camSnapshotUrl) {
+      const snapUrl = p.camSnapshotUrl.includes('?') ? `${p.camSnapshotUrl}&t=${Date.now()}` : `${p.camSnapshotUrl}?t=${Date.now()}`;
+      img.src = snapUrl;
+      logTerminal(`Captured fresh LAN snapshot from ${p.name}.`, 'info');
+    } else {
+      loadSingleCloudSnapshot();
+      logTerminal(`Captured fresh Cloud snapshot from ${p.name}.`, 'info');
     }
   });
 
@@ -1267,6 +1319,7 @@ async function sendJobAction(action) {
     p.state = 'ready';
     p.progress = 0;
     sendGcode('CANCEL_PRINT');
+    clearPrintCache(STATE.activePrinterId);
   }
   renderAll();
 }

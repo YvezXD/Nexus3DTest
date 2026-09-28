@@ -8,11 +8,12 @@ require_once __DIR__ . '/config.php';
 function handleApiRequest() {
     $action = $_GET['action'] ?? '';
     switch ($action) {
-        case 'push':     handlePush(); break;
-        case 'latest':   handleLatest(); break;
-        case 'snapshot': handleSnapshot(); break;
-        case 'printers': handlePrinters(); break;
-        default:         jsonResp(['error' => 'Unknown action'], 400);
+        case 'push':        handlePush(); break;
+        case 'latest':      handleLatest(); break;
+        case 'snapshot':    handleSnapshot(); break;
+        case 'printers':    handlePrinters(); break;
+        case 'clear_cache': handleClearCache(); break;
+        default:            jsonResp(['error' => 'Unknown action'], 400);
     }
 }
 
@@ -91,8 +92,6 @@ function handlePush() {
    Auth:  PHP session (logged-in user)
    ═══════════════════════════════════════════════════════════════════ */
 function handleLatest() {
-    requireSession();
-
     ensureNexusDirs();
     $telDir = nexusTelemetryDir();
     $printers = [];
@@ -104,27 +103,48 @@ function handleLatest() {
         $data = json_decode(file_get_contents($f), true);
         if (!$data) continue;
 
+        // Freshness indicator (seconds since last bridge push)
+        $age = time() - ($data['_bridge_ts'] ?? 0);
+        $data['_age'] = $age;
+
+        // If stale (>60s), mark offline
+        if ($age > 60) {
+            $data['online'] = false;
+            $data['state'] = 'offline';
+        }
+
+        // Clean stale print data if state is not actively printing or paused
+        $st = strtolower($data['state'] ?? 'ready');
+        if ($st !== 'printing' && $st !== 'paused') {
+            $data['progress'] = 0.0;
+            $data['currentLayer'] = 0;
+            $data['totalLayer'] = 0;
+            $data['filename'] = 'None (Standby)';
+            $data['elapsedSeconds'] = 0;
+            $data['totalDurationSeconds'] = 0;
+            $data['filamentUsedMm'] = 0.0;
+        }
+
         // Attach snapshot URL if file exists
         $snapFile = "$telDir/{$base}_snap.jpg";
         if (file_exists($snapFile)) {
             $data['snapshot_url'] = 'index.php?route=api&action=snapshot&printer='
                 . urlencode($base) . '&t=' . filemtime($snapFile);
         }
-        // Freshness indicator (seconds since last bridge push)
-        $data['_age'] = time() - ($data['_bridge_ts'] ?? 0);
+
         $printers[$base] = $data;
     }
 
+    header('Access-Control-Allow-Origin: *');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
     jsonResp(['status' => 'ok', 'printers' => $printers, 'server_time' => date('c')]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    SNAPSHOT  –  Serves the latest webcam JPEG for a printer
-   Auth:  PHP session
+   Accessible to dashboard <img> tags without session block
    ═══════════════════════════════════════════════════════════════════ */
 function handleSnapshot() {
-    requireSession();
-
     $id = preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['printer'] ?? '');
     if (!$id) { http_response_code(400); exit; }
 
@@ -133,15 +153,34 @@ function handleSnapshot() {
 
     if (!file_exists($file)) {
         http_response_code(404);
+        header('Access-Control-Allow-Origin: *');
         echo 'No snapshot available';
         exit;
     }
 
+    header('Access-Control-Allow-Origin: *');
     header('Content-Type: image/jpeg');
     header('Cache-Control: no-cache, no-store, must-revalidate');
     header('Content-Length: ' . filesize($file));
     readfile($file);
     exit;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLEAR_CACHE  –  Removes stale telemetry cache on print end/cancel
+   ═══════════════════════════════════════════════════════════════════ */
+function handleClearCache() {
+    ensureNexusDirs();
+    $telDir = nexusTelemetryDir();
+    $cleared = 0;
+    foreach (glob("$telDir/*.json") as $f) {
+        if (basename($f) !== 'manifest.json') {
+            @unlink($f);
+            $cleared++;
+        }
+    }
+    header('Access-Control-Allow-Origin: *');
+    jsonResp(['status' => 'ok', 'cleared' => $cleared, 'ts' => date('c')]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -169,9 +208,14 @@ function handlePrinters() {
 /* ─── Utilities ─── */
 function requireSession() {
     if (session_status() === PHP_SESSION_NONE) session_start();
-    if (empty($_SESSION['nexus_authenticated'])) {
-        jsonResp(['error' => 'Not authenticated'], 403);
+    if (!empty($_SESSION['nexus_authenticated'])) {
+        return;
     }
+    $token = extractBearerToken();
+    if ($token && $token === NEXUS_API_TOKEN) {
+        return;
+    }
+    jsonResp(['error' => 'Not authenticated'], 403);
 }
 
 function jsonResp($data, $code = 200) {

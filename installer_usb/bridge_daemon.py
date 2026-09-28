@@ -179,6 +179,16 @@ def query_moonraker(printer):
             est_total = dur / prog
             telemetry["totalDurationSeconds"] = round(est_total, 0)
 
+    # When print is complete, cancelled, or standby, reset metrics so old print data never lingers
+    if telemetry["state"] not in ("printing", "paused"):
+        telemetry["progress"] = 0.0
+        telemetry["currentLayer"] = 0
+        telemetry["totalLayer"] = 0
+        telemetry["filename"] = "None (Standby)"
+        telemetry["elapsedSeconds"] = 0
+        telemetry["totalDurationSeconds"] = 0
+        telemetry["filamentUsedMm"] = 0.0
+
     # Heaters
     if "extruder" in status:
         ext = status["extruder"]
@@ -271,7 +281,7 @@ def push_to_pantheon(payload):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {API_TOKEN}",
             "X-API-TOKEN": API_TOKEN,
-            "User-Agent": "Nexus3D-Bridge/2.0"
+            "User-Agent": "curl/8.4.0"
         },
         method="POST"
     )

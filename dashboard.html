@@ -131,11 +131,11 @@
           <div class="tab-info">
             <div class="tab-title-row">
               <span class="tab-name" id="p1TabName">QIDI Q2 (192.168.1.124)</span>
-              <span class="tab-state-pill pill-printing" id="p1StatePill">PRINTING</span>
+              <span class="tab-state-pill pill-standby" id="p1StatePill">SYNCING</span>
             </div>
             <div class="tab-meta-row">
               <span class="tab-ip">192.168.1.124</span>
-              <span class="tab-stat-preview" id="p1StatPreview">L: 193/259 • 260°C / 100°C</span>
+              <span class="tab-stat-preview" id="p1StatPreview">Connecting...</span>
             </div>
           </div>
         </button>
@@ -191,29 +191,29 @@
           <div class="fleet-thumb-wrap">
             <img src="assets/print_thumbnail.jpg" alt="Print Preview" class="fleet-thumb-img">
             <div class="thumb-overlay-progress">
-              <span id="fc1Percent">73.1%</span>
+              <span id="fc1Percent">0.0%</span>
             </div>
           </div>
           <div class="fleet-summary-meta">
             <div class="meta-row">
               <span class="meta-label">File</span>
-              <span class="meta-value gcode-name" id="fc1File">qidi-box-ams-snap-base...</span>
+              <span class="meta-value gcode-name" id="fc1File">None (Standby)</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Layer</span>
-              <span class="meta-value" id="fc1Layer">193 / 259</span>
+              <span class="meta-value" id="fc1Layer">0 / 0</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Extruder</span>
-              <span class="meta-value highlight-cyan" id="fc1Extruder">259.8°C / 260°C</span>
+              <span class="meta-value highlight-cyan" id="fc1Extruder">--°C / --°C</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Bed</span>
-              <span class="meta-value highlight-amber" id="fc1Bed">100.0°C / 100°C</span>
+              <span class="meta-value highlight-amber" id="fc1Bed">--°C / --°C</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Remaining</span>
-              <span class="meta-value highlight-emerald" id="fc1Remain">~46m</span>
+              <span class="meta-value highlight-emerald" id="fc1Remain">--:--:--</span>
             </div>
           </div>
         </div>
@@ -260,17 +260,17 @@
 
           <div class="job-info-block">
             <div class="job-title-row">
-              <h2 class="job-filename" id="heroFilename" title="qidi-box-ams-snap-base-for-v5.gcode.3mf">qidi-box-ams-snap-base-for-v5.gcode.3mf</h2>
-              <span class="badge-state-hero state-printing" id="heroStateBadge">PRINTING</span>
+              <h2 class="job-filename" id="heroFilename" title="Awaiting Print Job">None (Standby)</h2>
+              <span class="badge-state-hero state-standby" id="heroStateBadge">STANDBY</span>
             </div>
             
             <div class="job-progress-wrapper">
               <div class="progress-labels">
-                <span class="progress-layer-text" id="heroLayerText">Layer <strong id="heroCurLayer">15</strong> of <strong id="heroTotLayer">259</strong></span>
-                <span class="progress-percent-text" id="heroPercent">5.8%</span>
+                <span class="progress-layer-text" id="heroLayerText">Layer <strong id="heroCurLayer">0</strong> of <strong id="heroTotLayer">0</strong></span>
+                <span class="progress-percent-text" id="heroPercent">0.0%</span>
               </div>
               <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="heroProgressBar" style="width: 5.8%;">
+                <div class="progress-bar-fill" id="heroProgressBar" style="width: 0%;">
                   <div class="progress-glow-head"></div>
                 </div>
               </div>
@@ -280,19 +280,19 @@
             <div class="job-metrics-row">
               <div class="metric-mini-card">
                 <span class="metric-label">TIME ELAPSED</span>
-                <span class="metric-val mono" id="heroElapsed">00:32:14</span>
+                <span class="metric-val mono" id="heroElapsed">00:00:00</span>
               </div>
               <div class="metric-mini-card">
                 <span class="metric-label">TIME REMAINING</span>
-                <span class="metric-val mono highlight-emerald" id="heroRemaining">04:18:22</span>
+                <span class="metric-val mono highlight-emerald" id="heroRemaining">--:--:--</span>
               </div>
               <div class="metric-mini-card">
                 <span class="metric-label">FILAMENT USED</span>
-                <span class="metric-val mono highlight-cyan" id="heroFilament">2.77 m</span>
+                <span class="metric-val mono highlight-cyan" id="heroFilament">0.00 m</span>
               </div>
               <div class="metric-mini-card">
                 <span class="metric-label">TOTAL TIME EST.</span>
-                <span class="metric-val mono" id="heroTotalTime">04:50:36</span>
+                <span class="metric-val mono" id="heroTotalTime">--:--:--</span>
               </div>
             </div>
           </div>
@@ -606,26 +606,6 @@
             </div>
           </div>
 
-          <!-- REAL-TIME TEMPERATURE CHART -->
-          <div class="panel-card card-glass temp-chart-panel">
-            <div class="panel-header">
-              <div class="panel-title-group">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="icon-cyan">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                </svg>
-                <h3>Live Temperature Telemetry</h3>
-              </div>
-              <div class="chart-legend">
-                <span class="leg-item"><span class="dot-cyan"></span> Extruder</span>
-                <span class="leg-item"><span class="dot-cyan-dash"></span> Ext Target</span>
-                <span class="leg-item"><span class="dot-amber"></span> Bed</span>
-                <span class="leg-item"><span class="dot-amber-dash"></span> Bed Target</span>
-              </div>
-            </div>
-            <div class="panel-body chart-body">
-              <canvas id="tempCanvas" width="600" height="180"></canvas>
-            </div>
-          </div>
         </div>
 
         <!-- RIGHT COLUMN: Motion Jogging + Manual Controls + Terminal -->
