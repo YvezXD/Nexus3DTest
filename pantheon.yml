@@ -1,0 +1,15 @@
+# Pantheon Web Hosting Configuration
+# For 3D Printer Monitoring System (NEXUS 3D)
+api_version: 1
+
+# PHP version configuration
+php_version: 8.2
+
+# Web document root
+# Default is the repository root directory
+web_docroot: false
+
+# Protected web paths
+protected_web_paths:
+  - /pantheon.yml
+  - /README.md
