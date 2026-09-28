@@ -52,7 +52,7 @@
       <div class="sim-toggle-wrapper" title="Toggle simulation telemetry mode">
         <span class="toggle-label">Demo Sim</span>
         <label class="toggle-switch">
-          <input type="checkbox" id="simModeToggle">
+          <input type="checkbox" id="simModeToggle" name="simModeToggle" aria-label="Toggle Simulation Mode">
           <span class="slider round"></span>
         </label>
       </div>
@@ -141,7 +141,7 @@
         </button>
 
         <!-- Tab: Add Future Printer -->
-        <button class="printer-tab add-printer-tab" id="btnAddPrinterTab" title="Add another 3D Printer to Fleet">
+        <button class="printer-tab add-printer-tab" id="btnAddPrinterTab" title="Add another 3D Printer to Fleet" role="tab" aria-selected="false">
           <div class="add-printer-plus">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -232,7 +232,7 @@
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem;">+ Add Future Printer</h3>
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;" class="add-printer-title">+ Add Future Printer</h3>
         <p style="font-size: 0.82rem; color: var(--text-dim); max-width: 260px; margin-bottom: 1.2rem;">Expand your fleet with another Klipper, Moonraker, or Bambu 3D printer.</p>
         <button class="btn-sm btn-primary" id="btnFleetAddPrinter">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
@@ -491,7 +491,7 @@
                 <span>Speed Factor</span>
                 <span class="mono" id="speedFactorVal">100%</span>
               </div>
-              <input type="range" min="50" max="200" value="100" class="slider-control" id="speedFactorSlider">
+              <input type="range" min="50" max="200" value="100" class="slider-control" id="speedFactorSlider" name="speedFactorSlider" aria-label="Print Speed Factor Percentage">
             </div>
 
             <div class="chamber-slider-group">
@@ -499,7 +499,7 @@
                 <span>Part Fan Speed</span>
                 <span class="mono" id="fanSpeedVal">100%</span>
               </div>
-              <input type="range" min="0" max="100" value="100" class="slider-control" id="fanSpeedSlider">
+              <input type="range" min="0" max="100" value="100" class="slider-control" id="fanSpeedSlider" name="fanSpeedSlider" aria-label="Part Cooling Fan Speed Percentage">
             </div>
           </div>
         </div>
@@ -740,7 +740,7 @@
             <!-- Command Input Box -->
             <form class="terminal-input-row" id="terminalForm">
               <span class="term-prompt">&gt;</span>
-              <input type="text" class="term-input" id="terminalInput" placeholder="Send G-code command (e.g. G28, M105, STATUS)..." autocomplete="off">
+              <input type="text" class="term-input" id="terminalInput" name="terminalInput" placeholder="Send G-code command (e.g. G28, M105, STATUS)..." autocomplete="off" aria-label="G-code Terminal Command Input">
               <button type="submit" class="term-send-btn">Send</button>
             </form>
           </div>
@@ -847,25 +847,25 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgP1Name">Printer Name</label>
-              <input type="text" id="cfgP1Name" value="Printer 01 (QIDI X-Series)">
+              <input type="text" id="cfgP1Name" name="cfgP1Name" value="Printer 01 (QIDI X-Series)">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP1Ip">Local IP Address</label>
-              <input type="text" id="cfgP1Ip" value="192.168.1.124">
+              <input type="text" id="cfgP1Ip" name="cfgP1Ip" value="192.168.1.124">
             </div>
             <div class="form-group flex-1">
               <label for="cfgP1Port">API Port</label>
-              <input type="number" id="cfgP1Port" value="7125">
+              <input type="number" id="cfgP1Port" name="cfgP1Port" value="7125">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group flex-3">
               <label for="cfgP1Remote">Remote Tunnel URL (Optional Cloud Access)</label>
-              <input type="text" id="cfgP1Remote" placeholder="https://printer1.your-tunnel.net">
+              <input type="text" id="cfgP1Remote" name="cfgP1Remote" placeholder="https://printer1.your-tunnel.net">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP1Type">Controller</label>
-              <select id="cfgP1Type">
+              <select id="cfgP1Type" name="cfgP1Type">
                 <option value="moonraker" selected>Klipper / Moonraker</option>
                 <option value="octoprint">OctoPrint</option>
               </select>
@@ -876,11 +876,11 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgP1CamStream">Camera Stream URL</label>
-              <input type="text" id="cfgP1CamStream" value="http://192.168.1.124/webcam/?action=stream">
+              <input type="text" id="cfgP1CamStream" name="cfgP1CamStream" value="http://192.168.1.124/webcam/?action=stream">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP1CamSnapshot">Camera Snapshot URL</label>
-              <input type="text" id="cfgP1CamSnapshot" value="http://192.168.1.124/webcam/?action=snapshot">
+              <input type="text" id="cfgP1CamSnapshot" name="cfgP1CamSnapshot" value="http://192.168.1.124/webcam/?action=snapshot">
             </div>
           </div>
         </div>
@@ -891,25 +891,25 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgP2Name">Printer Name</label>
-              <input type="text" id="cfgP2Name" value="Printer 02 (CoreXY Pro)">
+              <input type="text" id="cfgP2Name" name="cfgP2Name" value="Printer 02 (CoreXY Pro)">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP2Ip">Local IP Address</label>
-              <input type="text" id="cfgP2Ip" value="192.168.1.36">
+              <input type="text" id="cfgP2Ip" name="cfgP2Ip" value="192.168.1.36">
             </div>
             <div class="form-group flex-1">
               <label for="cfgP2Port">API Port</label>
-              <input type="number" id="cfgP2Port" value="7125">
+              <input type="number" id="cfgP2Port" name="cfgP2Port" value="7125">
             </div>
           </div>
           <div class="form-row">
             <div class="form-group flex-3">
               <label for="cfgP2Remote">Remote Tunnel URL (Optional)</label>
-              <input type="text" id="cfgP2Remote" placeholder="https://printer2.your-tunnel.net">
+              <input type="text" id="cfgP2Remote" name="cfgP2Remote" placeholder="https://printer2.your-tunnel.net">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP2Type">Controller</label>
-              <select id="cfgP2Type">
+              <select id="cfgP2Type" name="cfgP2Type">
                 <option value="moonraker" selected>Klipper / Moonraker</option>
                 <option value="octoprint">OctoPrint</option>
               </select>
@@ -918,11 +918,11 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgP2CamStream">Camera Stream URL</label>
-              <input type="text" id="cfgP2CamStream" value="http://192.168.1.36:8080/?action=stream">
+              <input type="text" id="cfgP2CamStream" name="cfgP2CamStream" value="http://192.168.1.36:8080/?action=stream">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP2CamSnapshot">Camera Snapshot URL</label>
-              <input type="text" id="cfgP2CamSnapshot" value="http://192.168.1.36:8080/?action=snapshot">
+              <input type="text" id="cfgP2CamSnapshot" name="cfgP2CamSnapshot" value="http://192.168.1.36:8080/?action=snapshot">
             </div>
           </div>
         </div>
@@ -932,7 +932,7 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgPollInterval">Telemetry Polling Rate</label>
-              <select id="cfgPollInterval">
+              <select id="cfgPollInterval" name="cfgPollInterval">
                 <option value="1000">Fast (Every 1 second)</option>
                 <option value="2000" selected>Balanced (Every 2 seconds)</option>
                 <option value="5000">Eco (Every 5 seconds)</option>
@@ -940,7 +940,7 @@ cors_domains:
             </div>
             <div class="form-group flex-2">
               <label for="cfgCamMode">Webcam Display Mode</label>
-              <select id="cfgCamMode">
+              <select id="cfgCamMode" name="cfgCamMode">
                 <option value="stream" selected>Live MJPEG Stream</option>
                 <option value="snapshot">Periodic Snapshot Polling</option>
                 <option value="placeholder">High-Res Render</option>
