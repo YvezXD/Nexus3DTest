@@ -248,7 +248,7 @@ async function pollPrinters() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1200);
       const p1 = STATE.printers.p1;
-      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
+      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor`;
       const resp = await fetch(lanQuery, { signal: controller.signal });
       clearTimeout(timeoutId);
 
@@ -325,6 +325,14 @@ function applyMoonrakerStatus(id, status) {
     p.bed.actual = parseFloat(status.heater_bed.temperature.toFixed(1));
     p.bed.target = parseFloat(status.heater_bed.target.toFixed(1));
     p.bed.power = status.heater_bed.power || 0;
+  }
+  // Chamber temperature
+  if (status['heater_generic chamber']) {
+    p.chamber.actual = parseFloat(status['heater_generic chamber'].temperature.toFixed(1));
+  } else if (status['temperature_sensor Chamber_Thermal_Protection_Sensor']) {
+    p.chamber.actual = parseFloat(status['temperature_sensor Chamber_Thermal_Protection_Sensor'].temperature.toFixed(1));
+  } else if (status.chamber) {
+    p.chamber.actual = parseFloat(status.chamber.temperature.toFixed(1));
   }
   if (status.toolhead) {
     p.toolhead.x = parseFloat(status.toolhead.position[0].toFixed(1));
@@ -765,6 +773,7 @@ function renderFocusView() {
       heroProgressBar.classList.remove('animating');
     }
   }
+  if (heroElapsed) heroElapsed.textContent = formatDuration(p.elapsedSeconds);
   if (heroRemaining) heroRemaining.textContent = formatDuration(Math.max(0, p.totalDurationSeconds - p.elapsedSeconds));
   if (heroFilament) heroFilament.textContent = `${(p.filamentUsedMm / 1000).toFixed(2)} m`;
   if (heroTotalTime) heroTotalTime.textContent = formatDuration(p.totalDurationSeconds);
@@ -830,7 +839,10 @@ function renderFocusView() {
 
   // Chamber & Speeds
   const chamberVal = document.getElementById('chamberTempVal');
-  if (chamberVal) chamberVal.textContent = p.chamber.actual;
+  if (chamberVal) {
+    const act = (p.chamber && p.chamber.actual !== undefined) ? p.chamber.actual : 0.0;
+    chamberVal.textContent = (typeof act === 'number') ? act.toFixed(1) : act;
+  }
 
   // Stream preview HUD
   const hudTimestamp = document.getElementById('hudTimestamp');

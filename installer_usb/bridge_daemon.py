@@ -106,6 +106,7 @@ def query_moonraker(printer):
 
     objects = (
         "print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status"
+        "&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor"
     )
     query_path = f"/printer/objects/query?{objects}"
 
@@ -145,7 +146,7 @@ def query_moonraker(printer):
         "filamentUsedMm": 0.0,
         "extruder": {"actual": 0.0, "target": 0.0, "power": 0.0},
         "bed": {"actual": 0.0, "target": 0.0, "power": 0.0},
-        "chamber": {"actual": 25.0},
+        "chamber": {"actual": 0.0},
         "toolhead": {"x": 0.0, "y": 0.0, "z": 0.0, "maxVel": 600, "maxAccel": 10000, "fan": 0, "speedFactor": 100}
     }
 
@@ -201,6 +202,20 @@ def query_moonraker(printer):
         telemetry["bed"]["actual"] = round(float(bed.get("temperature", 0.0)), 1)
         telemetry["bed"]["target"] = round(float(bed.get("target", 0.0)), 1)
         telemetry["bed"]["power"] = round(float(bed.get("power", 0.0)), 2)
+
+    # Chamber temperature (QIDI Q2 / Klipper heated chamber)
+    ch_temp = None
+    if "heater_generic chamber" in status:
+        ch_temp = float(status["heater_generic chamber"].get("temperature", 0.0))
+    elif "temperature_sensor Chamber_Thermal_Protection_Sensor" in status:
+        ch_temp = float(status["temperature_sensor Chamber_Thermal_Protection_Sensor"].get("temperature", 0.0))
+    elif "chamber" in status:
+        ch_temp = float(status["chamber"].get("temperature", 0.0))
+    elif "temperature_sensor chamber" in status:
+        ch_temp = float(status["temperature_sensor chamber"].get("temperature", 0.0))
+
+    if ch_temp is not None and ch_temp > 0:
+        telemetry["chamber"]["actual"] = round(ch_temp, 1)
 
     # Toolhead kinematics
     if "toolhead" in status:
