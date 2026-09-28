@@ -26,7 +26,7 @@ const STATE = {
   printers: {
     p1: {
       id: 'p1',
-      name: 'Printer 01 (QIDI X-Series)',
+      name: 'QIDI Q2 (192.168.1.124)',
       ip: '192.168.1.124',
       port: 7125,
       type: 'moonraker',
@@ -36,16 +36,16 @@ const STATE = {
       online: true,
       state: 'printing', // 'printing', 'paused', 'ready', 'standby', 'offline'
       filename: 'qidi-box-ams-snap-base-for-v5.gcode.3mf',
-      currentLayer: 15,
+      currentLayer: 193,
       totalLayer: 259,
-      progress: 5.8,
-      elapsedSeconds: 1934,
-      totalDurationSeconds: 17400,
-      filamentUsedMm: 2769.7,
-      extruder: { actual: 259.8, target: 260.0, power: 0.42 },
-      bed: { actual: 100.1, target: 100.0, power: 0.33 },
+      progress: 73.1,
+      elapsedSeconds: 7578,
+      totalDurationSeconds: 10365,
+      filamentUsedMm: 14348.7,
+      extruder: { actual: 259.8, target: 260.0, power: 0.51 },
+      bed: { actual: 100.0, target: 100.0, power: 0.34 },
       chamber: { actual: 48.2 },
-      toolhead: { x: 113.3, y: 112.5, z: 2.01, maxVel: 600, maxAccel: 10000, fan: 100, speedFactor: 100 }
+      toolhead: { x: 49.8, y: 175.0, z: 24.04, maxVel: 600, maxAccel: 10000, fan: 100, speedFactor: 100 }
     },
     p2: {
       id: 'p2',
@@ -91,9 +91,13 @@ function detectHostingEnvironment() {
   const isPantheon = window.location.hostname.includes('pantheonsite.io') || window.location.hostname.includes('pantheon');
   const banner = document.getElementById('networkBanner');
 
-  if (isHttps || isPantheon) {
+  if (STATE.printers.p1.remoteUrl) {
+    if (banner) banner.style.display = 'none';
+    logTerminal(`Remote tunnel active: ${STATE.printers.p1.remoteUrl}. Remote connection ready.`, 'success');
+  } else if (isHttps || isPantheon) {
     if (banner) banner.style.display = 'block';
-    logTerminal('Detected Pantheon Cloud HTTPS hosting. Direct LAN fetch might require CORS or Tunnel.', 'warning');
+    logTerminal('Connected to NEXUS 3D on Pantheon Cloud HTTPS. Local LAN polling active for QIDI Q2 (192.168.1.124).', 'info');
+    logTerminal('For mobile / remote access outside your home Wi-Fi, click "Remote Access Guide" above.', 'info');
   } else {
     logTerminal('Running in direct network environment. Client-side LAN direct link initialized.', 'info');
   }
@@ -212,34 +216,71 @@ async function pollPrinters() {
 
 async function pollPrinter1Hardware() {
   const p1 = STATE.printers.p1;
-  const baseUrl = p1.remoteUrl || `http://${p1.ip}:${p1.port}`;
+  const baseUrls = [];
+  if (p1.remoteUrl) {
+    baseUrls.push(p1.remoteUrl.replace(/\/+$/, ''));
+  }
+  // Try port 80 first (nginx reverse proxy, no CORS check), then direct port 7125
+  baseUrls.push(`http://${p1.ip}`);
+  baseUrls.push(`http://${p1.ip}:${p1.port}`);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1800);
+  let lastErr = null;
+  let data = null;
 
-  const queryUrl = `${baseUrl}/printer/objects/query?print_stats&heater_bed&extruder&toolhead`;
+  for (const baseUrl of baseUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1800);
+      const queryUrl = `${baseUrl}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
 
-  const resp = await fetch(queryUrl, {
-    method: 'GET',
-    headers: { 'Accept': 'application/json' },
-    signal: controller.signal
-  });
-  clearTimeout(timeoutId);
+      const resp = await fetch(queryUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
+      if (resp.ok) {
+        data = await resp.json();
+        break;
+      }
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (!data && lastErr) throw lastErr;
 
   if (data && data.result && data.result.status) {
     const s = data.result.status;
     if (s.print_stats) {
       p1.filename = s.print_stats.filename || p1.filename;
       p1.state = s.print_stats.state || p1.state;
-      p1.elapsedSeconds = s.print_stats.total_duration || p1.elapsedSeconds;
       p1.filamentUsedMm = s.print_stats.filament_used || p1.filamentUsedMm;
+
+      const printDur = s.print_stats.print_duration || s.print_stats.total_duration || p1.elapsedSeconds;
+      p1.elapsedSeconds = printDur;
+
       if (s.print_stats.info) {
         p1.currentLayer = s.print_stats.info.current_layer || p1.currentLayer;
         p1.totalLayer = s.print_stats.info.total_layer || p1.totalLayer;
-        p1.progress = p1.totalLayer > 0 ? ((p1.currentLayer / p1.totalLayer) * 100) : 0;
+      }
+
+      // Sync progress & remaining time exactly matching Fluidd
+      let prog = 0;
+      if (s.virtual_sdcard && s.virtual_sdcard.progress !== undefined && s.virtual_sdcard.progress > 0) {
+        prog = s.virtual_sdcard.progress;
+      } else if (s.display_status && s.display_status.progress !== undefined && s.display_status.progress > 0) {
+        prog = s.display_status.progress;
+      } else if (p1.totalLayer > 0) {
+        prog = p1.currentLayer / p1.totalLayer;
+      }
+
+      if (prog > 0) {
+        p1.progress = parseFloat((prog * 100).toFixed(1));
+        const estTotal = printDur / prog;
+        p1.totalDurationSeconds = estTotal;
+        p1.remainingSeconds = Math.max(0, estTotal - printDur);
       }
     }
     if (s.extruder) {
@@ -287,13 +328,13 @@ function simulateTelemetry(isHardwareFallback = false) {
     p1.extruder.power = Math.max(0.1, Math.min(1.0, 0.40 + Math.sin(simTick * 0.1) * 0.08));
     p1.bed.power = Math.max(0.1, Math.min(1.0, 0.33 + Math.cos(simTick * 0.1) * 0.05));
 
-    // Toolhead moving dynamically inside part perimeter
-    const centerX = 113;
-    const centerY = 112;
+    // Toolhead moving dynamically inside live part perimeter
+    const centerX = 50;
+    const centerY = 175;
     const radius = 25;
     p1.toolhead.x = parseFloat((centerX + Math.cos(simTick * 0.6) * radius).toFixed(1));
     p1.toolhead.y = parseFloat((centerY + Math.sin(simTick * 0.6) * radius).toFixed(1));
-    p1.toolhead.z = parseFloat((0.2 + (p1.currentLayer * 0.2)).toFixed(2));
+    p1.toolhead.z = parseFloat((24.0 + (Math.sin(simTick * 0.05) * 0.1)).toFixed(2));
   }
 
   recordTempHistory('p1', p1.extruder.actual, p1.extruder.target, p1.bed.actual, p1.bed.target);
@@ -605,10 +646,10 @@ function renderFocusView() {
   if (extTempTar) extTempTar.textContent = p.extruder.target;
   if (extPower) extPower.textContent = `PWR: ${Math.round(p.extruder.power * 100)}%`;
   if (extCircle) {
-    // Circle circumference is 2 * PI * 50 = ~314
+    // Circle circumference is 2 * PI * 58 = ~364.4
     // Scale 0 - 300 deg C
     const ratio = Math.min(1, Math.max(0, p.extruder.actual / 300));
-    extCircle.style.strokeDashoffset = 314 - (ratio * 314);
+    extCircle.style.strokeDashoffset = 364.4 - (ratio * 364.4);
   }
 
   // Bed Gauge
@@ -623,7 +664,7 @@ function renderFocusView() {
   if (bedCircle) {
     // Scale 0 - 120 deg C
     const ratio = Math.min(1, Math.max(0, p.bed.actual / 120));
-    bedCircle.style.strokeDashoffset = 314 - (ratio * 314);
+    bedCircle.style.strokeDashoffset = 364.4 - (ratio * 364.4);
   }
 
   // Kinematics
@@ -895,6 +936,34 @@ function initEventListeners() {
       switchPrinter(target);
       setViewMode('focus');
     });
+  });
+
+  // Add Printer Button in tabs bar opens config modal
+  document.getElementById('btnAddPrinterTab')?.addEventListener('click', openConfigModal);
+  document.getElementById('btnFleetAddPrinter')?.addEventListener('click', openConfigModal);
+  document.getElementById('btnOpenFleetConfig')?.addEventListener('click', openConfigModal);
+
+  // Tunnel modal
+  document.getElementById('openTunnelHelpBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('quickTunnelInput');
+    if (input) input.value = STATE.printers.p1.remoteUrl || '';
+    document.getElementById('tunnelModal').style.display = 'flex';
+  });
+  document.getElementById('closeTunnelModal')?.addEventListener('click', () => {
+    document.getElementById('tunnelModal').style.display = 'none';
+  });
+  document.getElementById('btnCloseTunnelModal')?.addEventListener('click', () => {
+    document.getElementById('tunnelModal').style.display = 'none';
+  });
+  document.getElementById('btnSaveQuickTunnel')?.addEventListener('click', () => {
+    const input = document.getElementById('quickTunnelInput');
+    const val = input.value.trim();
+    STATE.printers.p1.remoteUrl = val;
+    saveConfigToStorage();
+    document.getElementById('tunnelModal').style.display = 'none';
+    logTerminal(`Remote tunnel URL set to: ${val || '(direct LAN)'}`, 'success');
+    pollPrinters();
+    updateCameraFeed(true);
   });
 
   // View mode switcher

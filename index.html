@@ -111,51 +111,50 @@
     <!-- Fleet Tabs & View Mode Switcher -->
     <section class="fleet-tabs-bar">
       <div class="tabs-list" role="tablist">
-        <!-- Tab: Printer 1 -->
+        <!-- Tab: QIDI Q2 (Primary) -->
         <button class="printer-tab active" id="tabPrinter1" data-printer="p1" role="tab" aria-selected="true">
           <div class="tab-indicator status-printing" id="p1TabDot"></div>
           <div class="tab-info">
             <div class="tab-title-row">
-              <span class="tab-name" id="p1TabName">Printer 01 (QIDI X-Series)</span>
+              <span class="tab-name" id="p1TabName">QIDI Q2 (192.168.1.124)</span>
               <span class="tab-state-pill pill-printing" id="p1StatePill">PRINTING</span>
             </div>
             <div class="tab-meta-row">
-              <span class="tab-ip">192.168.1.124:7125</span>
-              <span class="tab-stat-preview" id="p1StatPreview">L: 15/259 • 260°C / 100°C</span>
+              <span class="tab-ip">192.168.1.124</span>
+              <span class="tab-stat-preview" id="p1StatPreview">L: 193/259 • 260°C / 100°C</span>
             </div>
           </div>
         </button>
 
-        <!-- Tab: Printer 2 -->
-        <button class="printer-tab" id="tabPrinter2" data-printer="p2" role="tab" aria-selected="false">
-          <div class="tab-indicator status-offline" id="p2TabDot"></div>
+        <!-- Tab: Add Future Printer -->
+        <button class="printer-tab add-printer-tab" id="btnAddPrinterTab" title="Add another 3D Printer to Fleet">
+          <div class="add-printer-plus">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </div>
           <div class="tab-info">
             <div class="tab-title-row">
-              <span class="tab-name" id="p2TabName">Printer 02 (CoreXY Pro)</span>
-              <span class="tab-state-pill pill-offline" id="p2StatePill">OFFLINE / STANDBY</span>
+              <span class="tab-name">+ Add Future Printer</span>
+              <span class="tab-state-pill pill-standby">SLOT OPEN</span>
             </div>
             <div class="tab-meta-row">
-              <span class="tab-ip">192.168.1.36:7125</span>
-              <span class="tab-stat-preview" id="p2StatPreview">Unreachable (Click to ping)</span>
+              <span class="tab-ip text-dim">Add 2nd Printer / Remote</span>
             </div>
           </div>
         </button>
       </div>
 
-      <!-- View Mode Buttons -->
+      <!-- View Mode Controls -->
       <div class="view-mode-controls">
-        <button class="view-btn active" id="viewFocusBtn" title="Detailed Single-Printer View">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <button class="view-btn tunnel-btn" id="openTunnelHelpBtn" title="Set up Remote Access from outside home network">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
           </svg>
-          <span>Focus View</span>
-        </button>
-        <button class="view-btn" id="viewDualBtn" title="Dual Fleet Overview View">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="9" height="18" rx="1"></rect>
-            <rect x="13" y="3" width="9" height="18" rx="1"></rect>
-          </svg>
-          <span>Fleet Split</span>
+          <span>Remote Access Guide</span>
         </button>
         <button class="refresh-btn" id="globalRefreshBtn" title="Manual Telemetry Poll">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -175,7 +174,7 @@
           <div class="card-title-group">
             <span class="status-indicator-dot online"></span>
             <div>
-              <h3 class="card-title">Printer 01 • QIDI Klipper</h3>
+              <h3 class="card-title">QIDI Q2 (192.168.1.124)</h3>
               <span class="card-sub">IP: 192.168.1.124 | Moonraker v1.4</span>
             </div>
           </div>
@@ -186,7 +185,7 @@
           <div class="fleet-thumb-wrap">
             <img src="assets/print_thumbnail.jpg" alt="Print Preview" class="fleet-thumb-img">
             <div class="thumb-overlay-progress">
-              <span id="fc1Percent">5.8%</span>
+              <span id="fc1Percent">73.1%</span>
             </div>
           </div>
           <div class="fleet-summary-meta">
@@ -196,7 +195,7 @@
             </div>
             <div class="meta-row">
               <span class="meta-label">Layer</span>
-              <span class="meta-value" id="fc1Layer">15 / 259</span>
+              <span class="meta-value" id="fc1Layer">193 / 259</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Extruder</span>
@@ -204,11 +203,11 @@
             </div>
             <div class="meta-row">
               <span class="meta-label">Bed</span>
-              <span class="meta-value highlight-amber" id="fc1Bed">100.1°C / 100°C</span>
+              <span class="meta-value highlight-amber" id="fc1Bed">100.0°C / 100°C</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">Remaining</span>
-              <span class="meta-value highlight-emerald" id="fc1Remain">4h 18m</span>
+              <span class="meta-value highlight-emerald" id="fc1Remain">~46m</span>
             </div>
           </div>
         </div>
@@ -219,55 +218,23 @@
         </div>
       </div>
 
-      <!-- Fleet Card 2 -->
-      <div class="fleet-card card-glass" id="fleetCard2">
-        <div class="card-header">
-          <div class="card-title-group">
-            <span class="status-indicator-dot offline" id="fc2Dot"></span>
-            <div>
-              <h3 class="card-title">Printer 02 • CoreXY Pro</h3>
-              <span class="card-sub">IP: 192.168.1.36 | Port 7125</span>
-            </div>
-          </div>
-          <span class="badge-status-glow standby" id="fc2Badge">OFFLINE / STANDBY</span>
+      <!-- Fleet Card 2: Add Future Printer Slot -->
+      <div class="fleet-card card-glass add-printer-card" id="fleetCard2" style="border-style: dashed; border-color: rgba(255,255,255,0.18); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 2.2rem 1.5rem; min-height: 250px;">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(0, 242, 254, 0.08); border: 1px dashed var(--accent-cyan); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent-cyan);">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
         </div>
-        
-        <div class="fleet-card-body">
-          <div class="fleet-thumb-wrap">
-            <img src="assets/printer2_standby.jpg" alt="Printer 2 Standby" class="fleet-thumb-img grayscale" id="fc2Img">
-            <div class="thumb-overlay-idle" id="fc2Overlay">
-              <span>STANDBY</span>
-            </div>
-          </div>
-          <div class="fleet-summary-meta">
-            <div class="meta-row">
-              <span class="meta-label">State</span>
-              <span class="meta-value" id="fc2StateText">Disconnected</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">Target IP</span>
-              <span class="meta-value">192.168.1.36</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">Extruder</span>
-              <span class="meta-value highlight-cyan" id="fc2Extruder">--°C</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">Bed</span>
-              <span class="meta-value highlight-amber" id="fc2Bed">--°C</span>
-            </div>
-            <div class="meta-row">
-              <span class="meta-label">Diagnostic</span>
-              <span class="meta-value text-muted" id="fc2Diag">No response on port 7125</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="fleet-card-footer">
-          <button class="btn-sm btn-outline select-printer-btn" data-target="p2">Open Details</button>
-          <button class="btn-sm btn-primary" id="fc2PingBtn">Ping 192.168.1.36</button>
-          <button class="btn-sm btn-accent" id="fc2SimToggle">Simulate Online</button>
-        </div>
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem;">+ Add Future Printer</h3>
+        <p style="font-size: 0.82rem; color: var(--text-dim); max-width: 260px; margin-bottom: 1.2rem;">Expand your fleet with another Klipper, Moonraker, or Bambu 3D printer.</p>
+        <button class="btn-sm btn-primary" id="btnFleetAddPrinter">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Configure Fleet Slot
+        </button>
       </div>
     </section>
 
@@ -371,15 +338,22 @@
 
           <div class="gauge-body">
             <div class="gauge-circle-wrap">
-              <svg viewBox="0 0 120 120" class="gauge-svg">
-                <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
-                <circle class="gauge-fill gauge-cyan" id="extGaugeCircle" cx="60" cy="60" r="50" style="stroke-dashoffset: 80;"></circle>
+              <svg viewBox="0 0 140 140" class="gauge-svg">
+                <circle class="gauge-bg" cx="70" cy="70" r="58"></circle>
+                <circle class="gauge-fill gauge-cyan" id="extGaugeCircle" cx="70" cy="70" r="58" style="stroke-dashoffset: 80;"></circle>
               </svg>
               <div class="gauge-center-readout">
-                <span class="readout-actual mono" id="extTempActual">259.8</span>
-                <span class="readout-unit">°C</span>
-                <span class="readout-target mono">Target: <span id="extTempTarget">260</span>°C</span>
+                <div class="readout-main">
+                  <span class="readout-actual mono" id="extTempActual">259.8</span>
+                  <span class="readout-unit">°C</span>
+                </div>
               </div>
+            </div>
+
+            <!-- Target temperature badge neatly placed below circle to prevent any clipping -->
+            <div class="gauge-target-badge">
+              <span class="target-badge-label">TARGET</span>
+              <span class="target-badge-val mono"><span id="extTempTarget">260.0</span>°C</span>
             </div>
             
             <!-- Quick Heating Presets -->
@@ -403,20 +377,27 @@
               </svg>
               <span>HEATED BED</span>
             </div>
-            <span class="power-tag" id="bedPowerTag">PWR: 33%</span>
+            <span class="power-tag" id="bedPowerTag">PWR: 34%</span>
           </div>
 
           <div class="gauge-body">
             <div class="gauge-circle-wrap">
-              <svg viewBox="0 0 120 120" class="gauge-svg">
-                <circle class="gauge-bg" cx="60" cy="60" r="50"></circle>
-                <circle class="gauge-fill gauge-amber" id="bedGaugeCircle" cx="60" cy="60" r="50" style="stroke-dashoffset: 140;"></circle>
+              <svg viewBox="0 0 140 140" class="gauge-svg">
+                <circle class="gauge-bg" cx="70" cy="70" r="58"></circle>
+                <circle class="gauge-fill gauge-amber" id="bedGaugeCircle" cx="70" cy="70" r="58" style="stroke-dashoffset: 140;"></circle>
               </svg>
               <div class="gauge-center-readout">
-                <span class="readout-actual mono" id="bedTempActual">100.1</span>
-                <span class="readout-unit">°C</span>
-                <span class="readout-target mono">Target: <span id="bedTempTarget">100</span>°C</span>
+                <div class="readout-main">
+                  <span class="readout-actual mono" id="bedTempActual">100.0</span>
+                  <span class="readout-unit">°C</span>
+                </div>
               </div>
+            </div>
+
+            <!-- Target temperature badge neatly placed below circle -->
+            <div class="gauge-target-badge">
+              <span class="target-badge-label">TARGET</span>
+              <span class="target-badge-val mono"><span id="bedTempTarget">100.0</span>°C</span>
             </div>
 
             <!-- Quick Bed Presets -->
@@ -1087,9 +1068,65 @@ cors_domains:
             <polyline points="15 3 21 3 21 9"></polyline>
             <line x1="10" y1="14" x2="21" y2="3"></line>
           </svg>
-          Or Open in Popout Window (Instant)
-        </button>
         <button class="btn-outline" id="btnCloseChromeGuide">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== REMOTE ACCESS / CLOUDFLARE TUNNEL MODAL ==================== -->
+  <div class="modal-backdrop" id="tunnelModal" style="display: none;">
+    <div class="modal-window card-glass guide-modal-window">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="icon-cyan">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          <h2>Remote Access Guide (Connecting Outside Home Wi-Fi)</h2>
+        </div>
+        <button class="modal-close-btn" id="closeTunnelModal">&times;</button>
+      </div>
+
+      <div class="modal-body guide-body">
+        <p class="guide-intro">
+          When your computer or phone is connected to cellular data (4G/5G) or a different Wi-Fi, private IP addresses like <code>192.168.1.124</code> cannot be reached across the internet.
+        </p>
+
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Use a Free Cloudflare Tunnel or Ngrok</h3>
+            <p>On your computer on the same home network, you can run a free lightweight tunnel that exposes your QIDI Q2 printer over a secure HTTPS URL.</p>
+            <p>Download <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/" target="_blank" style="color:var(--accent-cyan);">cloudflared</a> and run in PowerShell:</p>
+            <pre class="code-block"><code>cloudflared tunnel --url http://192.168.1.124:80</code></pre>
+            <p class="guide-tip">It will generate a free public URL like: <code>https://example-random-words.trycloudflare.com</code></p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Enter Your Remote Tunnel URL Below</h3>
+            <p>Once you have a tunnel URL (Cloudflare, Tailscale Funnel, or Ngrok), paste it here:</p>
+            <div class="form-row" style="margin-top: 0.6rem;">
+              <input type="text" id="quickTunnelInput" placeholder="https://your-printer-tunnel.trycloudflare.com" style="flex: 1; padding: 0.6rem; background: var(--bg-input); border: 1px solid var(--border-subtle); color: #fff; border-radius: 6px;">
+              <button class="btn-primary" id="btnSaveQuickTunnel">Save & Connect</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Enjoy 100% Sync Anywhere in the World</h3>
+            <p>With an HTTPS tunnel URL, your live camera stream, telemetry graphs, and G-code terminal work seamlessly from anywhere, with zero mixed-content restrictions!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline" id="btnCloseTunnelModal">Close</button>
       </div>
     </div>
   </div>
