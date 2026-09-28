@@ -547,6 +547,20 @@
 
               <div class="panel-actions">
                 <span class="fps-badge" id="cameraFpsBadge">15 FPS</span>
+                
+                <button class="panel-icon-btn btn-popout" id="btnPopoutCam" title="Open Stream in Popout Window (Bypasses HTTPS Block)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  <span>Popout</span>
+                </button>
+
+                <button class="panel-icon-btn" id="btnToggleSnapMode" title="Toggle Auto-Snapshot Polling">
+                  <span id="snapModeLabel">Snapshot</span>
+                </button>
+
                 <button class="panel-icon-btn" id="btnSnapCam" title="Take Instant Camera Snapshot">
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
@@ -565,10 +579,43 @@
               <!-- Camera Stream Container -->
               <div class="stream-wrapper" id="streamWrapper">
                 <img id="cameraStreamImg" src="assets/print_thumbnail.jpg" alt="3D Printer Camera Stream" class="live-stream-feed">
+                
+                <!-- Browser Mixed-Content Blocked Helper Overlay -->
+                <div class="camera-blocked-overlay" id="cameraBlockedOverlay" style="display: none;">
+                  <div class="blocked-card card-glass">
+                    <div class="blocked-icon-box">
+                      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    </div>
+                    <h4 class="blocked-title">Browser Mixed-Content Restriction</h4>
+                    <p class="blocked-desc">
+                      Because Pantheon is loaded over <strong>HTTPS</strong>, modern browsers block direct HTTP camera feeds (<code id="blockedUrlDisplay">http://192.168.1.124/...</code>) inside the webpage.
+                    </p>
+                    <div class="blocked-btn-group">
+                      <button class="btn-primary btn-sm" id="btnBlockedPopout">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                          <polyline points="15 3 21 3 21 9"></polyline>
+                          <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                        Open in Popout Window (Always Works)
+                      </button>
+                      <button class="btn-outline btn-sm" id="btnBlockedGuide">
+                        Allow Insecure Content in Chrome (1-Click)
+                      </button>
+                      <button class="btn-outline btn-sm" id="btnBlockedSnapshot">
+                        Switch to Snapshot Mode
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="camera-hud-overlay">
                   <div class="hud-top-left">
                     <span class="hud-rec-dot"></span>
-                    <span class="hud-cam-name" id="hudCamName">CAM 1: QIDI HD</span>
+                    <span class="hud-cam-name" id="hudCamName">CAM 1: QIDI HD (192.168.1.124)</span>
                   </div>
                   <div class="hud-bottom-right">
                     <span id="hudTimestamp">2026-09-28 15:00:00</span>
@@ -875,6 +922,18 @@ cors_domains:
           </div>
         </div>
 
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP1CamStream">Camera Stream URL</label>
+              <input type="text" id="cfgP1CamStream" value="http://192.168.1.124/webcam/?action=stream">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP1CamSnapshot">Camera Snapshot URL</label>
+              <input type="text" id="cfgP1CamSnapshot" value="http://192.168.1.124/webcam/?action=snapshot">
+            </div>
+          </div>
+        </div>
+
         <!-- Printer 2 Settings -->
         <div class="config-section">
           <h3 class="config-section-title highlight-amber">Printer 02 Settings</h3>
@@ -903,6 +962,16 @@ cors_domains:
                 <option value="moonraker" selected>Klipper / Moonraker</option>
                 <option value="octoprint">OctoPrint</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP2CamStream">Camera Stream URL</label>
+              <input type="text" id="cfgP2CamStream" value="http://192.168.1.36:8080/?action=stream">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP2CamSnapshot">Camera Snapshot URL</label>
+              <input type="text" id="cfgP2CamSnapshot" value="http://192.168.1.36:8080/?action=snapshot">
             </div>
           </div>
         </div>
@@ -955,6 +1024,72 @@ cors_domains:
       <div class="modal-footer">
         <button class="btn-outline" id="btnCancelEstop">Cancel</button>
         <button class="btn-danger" id="btnConfirmEstop">CONFIRM EMERGENCY STOP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CHROME / EDGE INSECURE CONTENT GUIDE MODAL ==================== -->
+  <div class="modal-backdrop" id="chromeGuideModal" style="display: none;">
+    <div class="modal-window card-glass guide-modal-window">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="icon-cyan">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <h2>How to Enable Local Camera on Pantheon (Chrome / Edge)</h2>
+        </div>
+        <button class="modal-close-btn" id="closeChromeGuideModal">&times;</button>
+      </div>
+
+      <div class="modal-body guide-body">
+        <p class="guide-intro">
+          Because this dashboard is hosted on Pantheon with <strong>HTTPS</strong>, your browser blocks HTTP video streams (<code id="guidePrinterCamUrl">http://192.168.1.124/...</code>) by default under its <em>Insecure Content / Mixed Content</em> policy.
+        </p>
+
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Click the Tune / Padlock Icon in the Address Bar</h3>
+            <p>At the very top left of your browser, directly next to <code>https://dev-nexus3-d.pantheonsite.io/</code>, click the <strong>Tune / Settings icon</strong> (or Padlock icon).</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Open "Site Settings"</h3>
+            <p>Click on <strong>Site settings</strong> from the menu that appears. A new tab will open.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Set "Insecure Content" to ALLOW</h3>
+            <p>Scroll down to the <strong>Insecure content</strong> permission row and change the dropdown from <strong>Block (default)</strong> to <strong>Allow</strong>.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Reload This Dashboard</h3>
+            <p>Come back to this tab and click the <strong>Reload</strong> button. Your camera stream will load directly inside the dashboard!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnGuideOpenPopout">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+            <polyline points="15 3 21 3 21 9"></polyline>
+            <line x1="10" y1="14" x2="21" y2="3"></line>
+          </svg>
+          Or Open in Popout Window (Instant)
+        </button>
+        <button class="btn-outline" id="btnCloseChromeGuide">Close</button>
       </div>
     </div>
   </div>

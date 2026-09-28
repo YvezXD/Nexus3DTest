@@ -19,6 +19,9 @@ const STATE = {
     p2: []
   },
 
+  camMode: 'stream', // 'stream' or 'snapshot'
+  camSnapshotInterval: null,
+
   // Fleet Configs
   printers: {
     p1: {
@@ -51,8 +54,8 @@ const STATE = {
       port: 7125,
       type: 'moonraker',
       remoteUrl: '',
-      camStreamUrl: '',
-      camSnapshotUrl: '',
+      camStreamUrl: 'http://192.168.1.36:8080/?action=stream',
+      camSnapshotUrl: 'http://192.168.1.36:8080/?action=snapshot',
       online: false,
       state: 'offline',
       filename: 'None (Standby)',
@@ -77,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   initCanvases();
   startTelemetryPolling();
+  updateCameraFeed(true);
   renderAll();
 });
 
@@ -105,11 +109,15 @@ function loadStoredConfig() {
         STATE.printers.p1.ip = parsed.printers.p1.ip || STATE.printers.p1.ip;
         STATE.printers.p1.port = parsed.printers.p1.port || STATE.printers.p1.port;
         STATE.printers.p1.remoteUrl = parsed.printers.p1.remoteUrl || '';
+        STATE.printers.p1.camStreamUrl = parsed.printers.p1.camStreamUrl || STATE.printers.p1.camStreamUrl;
+        STATE.printers.p1.camSnapshotUrl = parsed.printers.p1.camSnapshotUrl || STATE.printers.p1.camSnapshotUrl;
 
         STATE.printers.p2.name = parsed.printers.p2.name || STATE.printers.p2.name;
         STATE.printers.p2.ip = parsed.printers.p2.ip || STATE.printers.p2.ip;
         STATE.printers.p2.port = parsed.printers.p2.port || STATE.printers.p2.port;
         STATE.printers.p2.remoteUrl = parsed.printers.p2.remoteUrl || '';
+        STATE.printers.p2.camStreamUrl = parsed.printers.p2.camStreamUrl || STATE.printers.p2.camStreamUrl;
+        STATE.printers.p2.camSnapshotUrl = parsed.printers.p2.camSnapshotUrl || STATE.printers.p2.camSnapshotUrl;
       }
       if (parsed.pollInterval) STATE.pollInterval = parsed.pollInterval;
       if (parsed.simMode !== undefined) {
@@ -131,13 +139,17 @@ function saveConfigToStorage() {
           name: STATE.printers.p1.name,
           ip: STATE.printers.p1.ip,
           port: STATE.printers.p1.port,
-          remoteUrl: STATE.printers.p1.remoteUrl
+          remoteUrl: STATE.printers.p1.remoteUrl,
+          camStreamUrl: STATE.printers.p1.camStreamUrl,
+          camSnapshotUrl: STATE.printers.p1.camSnapshotUrl
         },
         p2: {
           name: STATE.printers.p2.name,
           ip: STATE.printers.p2.ip,
           port: STATE.printers.p2.port,
-          remoteUrl: STATE.printers.p2.remoteUrl
+          remoteUrl: STATE.printers.p2.remoteUrl,
+          camStreamUrl: STATE.printers.p2.camStreamUrl,
+          camSnapshotUrl: STATE.printers.p2.camSnapshotUrl
         }
       },
       pollInterval: STATE.pollInterval,
@@ -322,6 +334,92 @@ function renderAll() {
   renderFocusView();
   renderTempChart();
   renderBedVisualizer();
+}
+
+let lastCamPrinter = null;
+function updateCameraFeed(force = false) {
+  const p = STATE.printers[STATE.activePrinterId];
+  if (!p) return;
+
+  const img = document.getElementById('cameraStreamImg');
+  const hudName = document.getElementById('hudCamName');
+  const blockedOverlay = document.getElementById('cameraBlockedOverlay');
+  const blockedUrlDisplay = document.getElementById('blockedUrlDisplay');
+  const fpsBadge = document.getElementById('cameraFpsBadge');
+  const snapModeLabel = document.getElementById('snapModeLabel');
+
+  if (!img) return;
+
+  const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
+  const snapshotUrl = p.camSnapshotUrl || `http://${p.ip}/webcam/?action=snapshot`;
+
+  if (hudName) {
+    hudName.textContent = STATE.activePrinterId === 'p1' 
+      ? `CAM 1: QIDI HD (${p.ip})` 
+      : `CAM 2: CoreXY Feed (${p.ip}:8080)`;
+  }
+
+  if (blockedUrlDisplay) {
+    blockedUrlDisplay.textContent = streamUrl;
+  }
+
+  // Clear existing snapshot polling
+  if (STATE.camSnapshotInterval) {
+    clearInterval(STATE.camSnapshotInterval);
+    STATE.camSnapshotInterval = null;
+  }
+
+  if (!force && lastCamPrinter === STATE.activePrinterId && STATE.camMode === 'stream') {
+    return;
+  }
+  lastCamPrinter = STATE.activePrinterId;
+
+  // Remove handlers
+  img.onerror = null;
+  img.onload = null;
+
+  if (STATE.camMode === 'stream') {
+    if (snapModeLabel) snapModeLabel.textContent = 'Snapshot Mode';
+    if (fpsBadge) fpsBadge.textContent = '15 FPS';
+
+    img.onerror = () => {
+      console.warn('Camera feed failed or blocked by browser mixed-content:', streamUrl);
+      if (blockedOverlay) blockedOverlay.style.display = 'flex';
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+      if (fpsBadge) fpsBadge.textContent = 'BLOCKED (HTTPS)';
+    };
+
+    img.onload = () => {
+      if (!img.src.includes('assets/')) {
+        if (blockedOverlay) blockedOverlay.style.display = 'none';
+        if (fpsBadge) fpsBadge.textContent = 'LIVE';
+      }
+    };
+
+    img.src = streamUrl;
+  } else if (STATE.camMode === 'snapshot') {
+    if (snapModeLabel) snapModeLabel.textContent = 'Stream Mode';
+    if (fpsBadge) fpsBadge.textContent = 'SNAP (1.5s)';
+
+    const pollSnapshot = () => {
+      const cacheBust = Date.now();
+      const testImg = new Image();
+      testImg.onload = () => {
+        img.src = `${snapshotUrl}?t=${cacheBust}`;
+        if (blockedOverlay) blockedOverlay.style.display = 'none';
+        if (fpsBadge) fpsBadge.textContent = 'SNAP (1.5s)';
+      };
+      testImg.onerror = () => {
+        if (blockedOverlay) blockedOverlay.style.display = 'flex';
+        img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+        if (fpsBadge) fpsBadge.textContent = 'BLOCKED (HTTPS)';
+      };
+      testImg.src = `${snapshotUrl}?t=${cacheBust}`;
+    };
+
+    pollSnapshot();
+    STATE.camSnapshotInterval = setInterval(pollSnapshot, 1500);
+  }
 }
 
 function updateLatency(ms) {
@@ -869,12 +967,53 @@ function initEventListeners() {
   });
 
   // Camera Actions
+  const openPopoutCam = () => {
+    const p = STATE.printers[STATE.activePrinterId];
+    const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
+    window.open(streamUrl, '3DPrinterCamera', 'width=700,height=530,resizable=yes,scrollbars=no');
+    logTerminal(`Opened camera popout window for ${p.name}`, 'info');
+  };
+
+  document.getElementById('btnPopoutCam')?.addEventListener('click', openPopoutCam);
+  document.getElementById('btnBlockedPopout')?.addEventListener('click', openPopoutCam);
+  document.getElementById('btnGuideOpenPopout')?.addEventListener('click', () => {
+    openPopoutCam();
+    document.getElementById('chromeGuideModal').style.display = 'none';
+  });
+
+  // Toggle Snapshot Mode
+  const toggleSnap = () => {
+    STATE.camMode = (STATE.camMode === 'stream') ? 'snapshot' : 'stream';
+    logTerminal(`Camera mode switched to ${STATE.camMode.toUpperCase()}`, 'info');
+    updateCameraFeed();
+  };
+  document.getElementById('btnToggleSnapMode')?.addEventListener('click', toggleSnap);
+  document.getElementById('btnBlockedSnapshot')?.addEventListener('click', () => {
+    STATE.camMode = 'snapshot';
+    updateCameraFeed();
+  });
+
+  // Mixed content Chrome / Edge guide modal
+  const openChromeGuide = () => {
+    const p = STATE.printers[STATE.activePrinterId];
+    const guideUrlEl = document.getElementById('guidePrinterCamUrl');
+    if (guideUrlEl) guideUrlEl.textContent = p.camStreamUrl || 'http://192.168.1.124/...';
+    document.getElementById('chromeGuideModal').style.display = 'flex';
+  };
+  document.getElementById('btnBlockedGuide')?.addEventListener('click', openChromeGuide);
+  document.getElementById('closeChromeGuideModal')?.addEventListener('click', () => {
+    document.getElementById('chromeGuideModal').style.display = 'none';
+  });
+  document.getElementById('btnCloseChromeGuide')?.addEventListener('click', () => {
+    document.getElementById('chromeGuideModal').style.display = 'none';
+  });
+
   document.getElementById('btnSnapCam')?.addEventListener('click', () => {
     const img = document.getElementById('cameraStreamImg');
-    const p1 = STATE.printers.p1;
-    if (img) {
-      img.src = `${p1.camSnapshotUrl}?t=${Date.now()}`;
-      logTerminal('Captured fresh camera snapshot.', 'info');
+    const p = STATE.printers[STATE.activePrinterId];
+    if (img && p.camSnapshotUrl) {
+      img.src = `${p.camSnapshotUrl}?t=${Date.now()}`;
+      logTerminal(`Captured fresh snapshot from ${p.name}.`, 'info');
     }
   });
 
@@ -980,6 +1119,7 @@ function initEventListeners() {
 function switchPrinter(printerId) {
   STATE.activePrinterId = printerId;
   logTerminal(`Switched active focus to ${STATE.printers[printerId].name}`, 'info');
+  updateCameraFeed(true);
   renderAll();
 }
 
@@ -1172,11 +1312,15 @@ function openConfigModal() {
   document.getElementById('cfgP1Ip').value = STATE.printers.p1.ip;
   document.getElementById('cfgP1Port').value = STATE.printers.p1.port;
   document.getElementById('cfgP1Remote').value = STATE.printers.p1.remoteUrl;
+  document.getElementById('cfgP1CamStream').value = STATE.printers.p1.camStreamUrl;
+  document.getElementById('cfgP1CamSnapshot').value = STATE.printers.p1.camSnapshotUrl;
 
   document.getElementById('cfgP2Name').value = STATE.printers.p2.name;
   document.getElementById('cfgP2Ip').value = STATE.printers.p2.ip;
   document.getElementById('cfgP2Port').value = STATE.printers.p2.port;
   document.getElementById('cfgP2Remote').value = STATE.printers.p2.remoteUrl;
+  document.getElementById('cfgP2CamStream').value = STATE.printers.p2.camStreamUrl;
+  document.getElementById('cfgP2CamSnapshot').value = STATE.printers.p2.camSnapshotUrl;
 
   document.getElementById('cfgPollInterval').value = STATE.pollInterval;
 }
@@ -1190,17 +1334,22 @@ function saveConfigForm() {
   STATE.printers.p1.ip = document.getElementById('cfgP1Ip').value.trim() || STATE.printers.p1.ip;
   STATE.printers.p1.port = parseInt(document.getElementById('cfgP1Port').value, 10) || 7125;
   STATE.printers.p1.remoteUrl = document.getElementById('cfgP1Remote').value.trim();
+  STATE.printers.p1.camStreamUrl = document.getElementById('cfgP1CamStream').value.trim() || STATE.printers.p1.camStreamUrl;
+  STATE.printers.p1.camSnapshotUrl = document.getElementById('cfgP1CamSnapshot').value.trim() || STATE.printers.p1.camSnapshotUrl;
 
   STATE.printers.p2.name = document.getElementById('cfgP2Name').value.trim() || STATE.printers.p2.name;
   STATE.printers.p2.ip = document.getElementById('cfgP2Ip').value.trim() || STATE.printers.p2.ip;
   STATE.printers.p2.port = parseInt(document.getElementById('cfgP2Port').value, 10) || 7125;
   STATE.printers.p2.remoteUrl = document.getElementById('cfgP2Remote').value.trim();
+  STATE.printers.p2.camStreamUrl = document.getElementById('cfgP2CamStream').value.trim() || STATE.printers.p2.camStreamUrl;
+  STATE.printers.p2.camSnapshotUrl = document.getElementById('cfgP2CamSnapshot').value.trim() || STATE.printers.p2.camSnapshotUrl;
 
   STATE.pollInterval = parseInt(document.getElementById('cfgPollInterval').value, 10) || 2000;
 
   saveConfigToStorage();
   closeConfigModal();
   startTelemetryPolling();
+  updateCameraFeed();
   renderAll();
   logTerminal('Configuration saved successfully.', 'success');
 }
@@ -1210,9 +1359,16 @@ function resetConfigForm() {
     localStorage.removeItem('nexus_3d_config');
     STATE.printers.p1.ip = '192.168.1.124';
     STATE.printers.p1.port = 7125;
+    STATE.printers.p1.camStreamUrl = 'http://192.168.1.124/webcam/?action=stream';
+    STATE.printers.p1.camSnapshotUrl = 'http://192.168.1.124/webcam/?action=snapshot';
+
     STATE.printers.p2.ip = '192.168.1.36';
     STATE.printers.p2.port = 7125;
+    STATE.printers.p2.camStreamUrl = 'http://192.168.1.36:8080/?action=stream';
+    STATE.printers.p2.camSnapshotUrl = 'http://192.168.1.36:8080/?action=snapshot';
+
     closeConfigModal();
+    updateCameraFeed();
     renderAll();
   }
 }
