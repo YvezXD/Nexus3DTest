@@ -2195,11 +2195,13 @@ input:checked + .slider:before {
 .term-line.error { color: #f87171; }
 .term-line.echo { color: var(--accent-cyan); }
 
-.term-time {
+.term-time,
+.term-line .term-time {
   color: #94a3b8;
   margin-right: 0.4rem;
 }
 
+#btnClearTerminal,
 .clear-term-btn {
   background: transparent;
   border: none;
@@ -2208,6 +2210,7 @@ input:checked + .slider:before {
   cursor: pointer;
   transition: color 0.2s;
 }
+#btnClearTerminal:hover,
 .clear-term-btn:hover { color: #ffffff; }
 
 .terminal-macros {
