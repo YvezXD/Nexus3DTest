@@ -498,7 +498,7 @@ function updateCameraFeed(forceReload = false) {
 
   if (STATE.simMode) {
     if (camSnapshotPoller) { clearInterval(camSnapshotPoller); camSnapshotPoller = null; }
-    img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+    img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
     if (fpsBadge) fpsBadge.textContent = 'DEMO';
     if (standbyOverlay) standbyOverlay.style.display = 'none';
     return;
@@ -582,7 +582,7 @@ function loadSingleCloudSnapshot(customUrl = null) {
   };
   preloader.onerror = () => {
     if (!img.src || img.src.includes('about:blank')) {
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
     }
     if (fpsBadge) fpsBadge.textContent = 'STANDBY';
   };
@@ -676,7 +676,11 @@ function renderDualFleet() {
   const fc1Ext = document.getElementById('fc1Extruder');
   const fc1Bed = document.getElementById('fc1Bed');
   const fc1Remain = document.getElementById('fc1Remain');
+  const fc1Img = document.querySelector('#fleetCard1 .fleet-thumb-img');
 
+  if (fc1Img && !fc1Img.src.includes('NewPrinterIcon')) {
+    fc1Img.src = 'assets/NewPrinterIcon.jpeg';
+  }
   if (fc1Percent) fc1Percent.textContent = `${p1.progress}%`;
   if (fc1File) fc1File.textContent = p1.filename;
   if (fc1Layer) fc1Layer.textContent = `${p1.currentLayer} / ${p1.totalLayer}`;
@@ -727,6 +731,12 @@ function renderFocusView() {
 
   // Hero Card
   const heroThumb = document.getElementById('heroThumb');
+  if (heroThumb) {
+    const targetThumb = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
+    if (!heroThumb.src.includes(targetThumb)) {
+      heroThumb.src = targetThumb;
+    }
+  }
   const heroLiveTag = document.getElementById('heroLiveTag');
   const heroFilename = document.getElementById('heroFilename');
   const heroStateBadge = document.getElementById('heroStateBadge');
