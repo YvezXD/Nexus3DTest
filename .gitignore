@@ -7,3 +7,10 @@ Thumbs.db
 # Logs & temp
 *.log
 scratch/
+__pycache__/
+*.pyc
+
+# Local runtime & bridge secrets
+installer_usb/python_runtime/
+installer_usb/config.env
+files/

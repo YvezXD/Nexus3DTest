@@ -13,3 +13,4 @@ web_docroot: false
 protected_web_paths:
   - /pantheon.yml
   - /README.md
+  - /private

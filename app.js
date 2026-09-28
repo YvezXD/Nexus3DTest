@@ -75,6 +75,7 @@ const STATE = {
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   loadStoredConfig();
   detectHostingEnvironment();
   initEventListeners();
@@ -84,23 +85,31 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
 });
 
-/* ==================== ENVIRONMENT & CONFIG ==================== */
+/* ==================== THEME & ENVIRONMENT ==================== */
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('nexus_theme') || 'dark';
+  applyTheme(savedTheme);
+
+  document.getElementById('themeToggleBtn')?.addEventListener('click', () => {
+    const isLight = document.body.classList.contains('light-theme');
+    applyTheme(isLight ? 'dark' : 'light');
+  });
+}
+
+function applyTheme(theme) {
+  const isLight = theme === 'light';
+  document.body.classList.remove('dark-theme', 'light-theme');
+  document.body.classList.add(isLight ? 'light-theme' : 'dark-theme');
+  localStorage.setItem('nexus_theme', theme);
+
+  const label = document.getElementById('themeBtnLabel');
+  if (label) label.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+}
 
 function detectHostingEnvironment() {
-  const isHttps = window.location.protocol === 'https:';
-  const isPantheon = window.location.hostname.includes('pantheonsite.io') || window.location.hostname.includes('pantheon');
-  const banner = document.getElementById('networkBanner');
-
-  if (STATE.printers.p1.remoteUrl) {
-    if (banner) banner.style.display = 'none';
-    logTerminal(`Remote tunnel active: ${STATE.printers.p1.remoteUrl}. Remote connection ready.`, 'success');
-  } else if (isHttps || isPantheon) {
-    if (banner) banner.style.display = 'block';
-    logTerminal('Connected to NEXUS 3D on Pantheon Cloud HTTPS. Local LAN polling active for QIDI Q2 (192.168.1.124).', 'info');
-    logTerminal('For mobile / remote access outside your home Wi-Fi, click "Remote Access Guide" above.', 'info');
-  } else {
-    logTerminal('Running in direct network environment. Client-side LAN direct link initialized.', 'info');
-  }
+  logTerminal('NEXUS 3D v2.0 initialized with Bridge Architecture.', 'info');
+  logTerminal('Polling Pantheon telemetry ingestion endpoint...', 'info');
 }
 
 function loadStoredConfig() {
@@ -189,24 +198,31 @@ async function pollPrinters() {
     return;
   }
 
-  // Attempt real query for Printer 1 (192.168.1.124)
+  // Poll Pantheon Ingestion API (/index.php?route=api&action=latest)
   try {
-    await pollPrinter1Hardware();
-    STATE.printers.p1.online = true;
-  } catch (err) {
-    // If CORS or offline, fallback smoothly or mark warning
-    console.warn('Printer 1 query failed or blocked by CORS:', err);
-    if (!STATE.simMode) {
-      // simulate realistic telemetry from last known live data
-      simulateTelemetry(true);
-    }
-  }
+    const resp = await fetch('index.php?route=api&action=latest', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
 
-  // Probe Printer 2 (192.168.1.36)
-  if (!STATE.printers.p2.online) {
-    // Keep offline or standby
-  } else {
-    simulatePrinter2();
+    if (resp.status === 401 || resp.status === 403) {
+      window.location.href = 'index.php?route=login';
+      return;
+    }
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    if (data.status === 'ok' && data.printers) {
+      handleBridgeTelemetry(data.printers);
+    } else {
+      showBridgeOffline('Awaiting Telemetry: No data received yet from local bridge.');
+    }
+  } catch (err) {
+    console.warn('Bridge query error:', err);
+    showBridgeOffline('Bridge Offline: Cannot connect to Pantheon telemetry endpoint.');
   }
 
   STATE.latency = Math.max(12, Math.floor(performance.now() - start));
@@ -214,95 +230,79 @@ async function pollPrinters() {
   renderAll();
 }
 
-async function pollPrinter1Hardware() {
+function handleBridgeTelemetry(bridgePrinters) {
+  const p1Data = bridgePrinters.p1;
+  const banner = document.getElementById('bridgeBanner');
+  const networkPulse = document.getElementById('networkPulse');
+  const networkLabel = document.getElementById('networkLabel');
+
+  if (!p1Data) {
+    showBridgeOffline('Bridge Offline: No telemetry from QIDI Q2 (192.168.1.124).');
+    return;
+  }
+
+  const age = p1Data._age !== undefined ? p1Data._age : 0;
+  if (age > 15) {
+    showBridgeOffline(`Bridge Stale: Last telemetry was ${age}s ago.`);
+  } else {
+    // Healthy bridge
+    if (banner) banner.style.display = 'none';
+    if (networkPulse) networkPulse.className = 'badge-dot pulse-cyan';
+    if (networkLabel) networkLabel.textContent = `Bridge: Online (${age}s)`;
+  }
+
+  // Sync Printer 1
   const p1 = STATE.printers.p1;
-  const baseUrls = [];
-  if (p1.remoteUrl) {
-    baseUrls.push(p1.remoteUrl.replace(/\/+$/, ''));
+  p1.online = p1Data.online !== false;
+  if (p1Data.state) p1.state = p1Data.state;
+  if (p1Data.filename) p1.filename = p1Data.filename;
+  if (p1Data.currentLayer !== undefined) p1.currentLayer = p1Data.currentLayer;
+  if (p1Data.totalLayer !== undefined) p1.totalLayer = p1Data.totalLayer;
+  if (p1Data.progress !== undefined) p1.progress = p1Data.progress;
+  if (p1Data.elapsedSeconds !== undefined) p1.elapsedSeconds = p1Data.elapsedSeconds;
+  if (p1Data.totalDurationSeconds !== undefined) p1.totalDurationSeconds = p1Data.totalDurationSeconds;
+  if (p1Data.filamentUsedMm !== undefined) p1.filamentUsedMm = p1Data.filamentUsedMm;
+
+  if (p1Data.extruder) {
+    p1.extruder.actual = p1Data.extruder.actual ?? p1.extruder.actual;
+    p1.extruder.target = p1Data.extruder.target ?? p1.extruder.target;
+    p1.extruder.power = p1Data.extruder.power ?? p1.extruder.power;
   }
-  // Try port 80 first (nginx reverse proxy, no CORS check), then direct port 7125
-  baseUrls.push(`http://${p1.ip}`);
-  baseUrls.push(`http://${p1.ip}:${p1.port}`);
-
-  let lastErr = null;
-  let data = null;
-
-  for (const baseUrl of baseUrls) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1800);
-      const queryUrl = `${baseUrl}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status`;
-
-      const resp = await fetch(queryUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      if (resp.ok) {
-        data = await resp.json();
-        break;
-      }
-    } catch (err) {
-      lastErr = err;
-    }
+  if (p1Data.bed) {
+    p1.bed.actual = p1Data.bed.actual ?? p1.bed.actual;
+    p1.bed.target = p1Data.bed.target ?? p1.bed.target;
+    p1.bed.power = p1Data.bed.power ?? p1.bed.power;
+  }
+  if (p1Data.chamber) {
+    p1.chamber.actual = p1Data.chamber.actual ?? p1.chamber.actual;
+  }
+  if (p1Data.toolhead) {
+    Object.assign(p1.toolhead, p1Data.toolhead);
   }
 
-  if (!data && lastErr) throw lastErr;
+  // Update Printer 2 if present in bridge payload
+  if (bridgePrinters.p2) {
+    Object.assign(STATE.printers.p2, bridgePrinters.p2);
+  }
 
-  if (data && data.result && data.result.status) {
-    const s = data.result.status;
-    if (s.print_stats) {
-      p1.filename = s.print_stats.filename || p1.filename;
-      p1.state = s.print_stats.state || p1.state;
-      p1.filamentUsedMm = s.print_stats.filament_used || p1.filamentUsedMm;
-
-      const printDur = s.print_stats.print_duration || s.print_stats.total_duration || p1.elapsedSeconds;
-      p1.elapsedSeconds = printDur;
-
-      if (s.print_stats.info) {
-        p1.currentLayer = s.print_stats.info.current_layer || p1.currentLayer;
-        p1.totalLayer = s.print_stats.info.total_layer || p1.totalLayer;
-      }
-
-      // Sync progress & remaining time exactly matching Fluidd
-      let prog = 0;
-      if (s.virtual_sdcard && s.virtual_sdcard.progress !== undefined && s.virtual_sdcard.progress > 0) {
-        prog = s.virtual_sdcard.progress;
-      } else if (s.display_status && s.display_status.progress !== undefined && s.display_status.progress > 0) {
-        prog = s.display_status.progress;
-      } else if (p1.totalLayer > 0) {
-        prog = p1.currentLayer / p1.totalLayer;
-      }
-
-      if (prog > 0) {
-        p1.progress = parseFloat((prog * 100).toFixed(1));
-        const estTotal = printDur / prog;
-        p1.totalDurationSeconds = estTotal;
-        p1.remainingSeconds = Math.max(0, estTotal - printDur);
-      }
-    }
-    if (s.extruder) {
-      p1.extruder.actual = parseFloat(s.extruder.temperature.toFixed(1));
-      p1.extruder.target = parseFloat(s.extruder.target.toFixed(1));
-      p1.extruder.power = s.extruder.power || 0;
-    }
-    if (s.heater_bed) {
-      p1.bed.actual = parseFloat(s.heater_bed.temperature.toFixed(1));
-      p1.bed.target = parseFloat(s.heater_bed.target.toFixed(1));
-      p1.bed.power = s.heater_bed.power || 0;
-    }
-    if (s.toolhead) {
-      p1.toolhead.x = parseFloat(s.toolhead.position[0].toFixed(1));
-      p1.toolhead.y = parseFloat(s.toolhead.position[1].toFixed(1));
-      p1.toolhead.z = parseFloat(s.toolhead.position[2].toFixed(2));
-      p1.toolhead.maxVel = s.toolhead.max_velocity || 600;
-      p1.toolhead.maxAccel = s.toolhead.max_accel || 10000;
-    }
+  // Update snapshot if URL available
+  if (p1Data.snapshot_url) {
+    updateBridgeCamera(p1Data.snapshot_url);
   }
 
   recordTempHistory('p1', p1.extruder.actual, p1.extruder.target, p1.bed.actual, p1.bed.target);
+}
+
+function showBridgeOffline(msg) {
+  const banner = document.getElementById('bridgeBanner');
+  const bannerText = document.getElementById('bridgeBannerText');
+  const networkPulse = document.getElementById('networkPulse');
+  const networkLabel = document.getElementById('networkLabel');
+
+  if (banner) banner.style.display = 'block';
+  if (bannerText) bannerText.innerHTML = `<strong>${msg}</strong> Ensure the bridge daemon is running on your LAN desktop.`;
+  if (networkPulse) networkPulse.className = 'badge-dot pulse-red';
+  if (networkLabel) networkLabel.textContent = 'Bridge: Offline';
 }
 
 /* ==================== SIMULATION TELEMETRY GENERATOR ==================== */
@@ -377,90 +377,55 @@ function renderAll() {
   renderBedVisualizer();
 }
 
-let lastCamPrinter = null;
+let lastCamFetchTime = 0;
+function updateBridgeCamera(snapshotUrl) {
+  const img = document.getElementById('cameraStreamImg');
+  const standbyOverlay = document.getElementById('cameraStandbyOverlay');
+  const fpsBadge = document.getElementById('cameraFpsBadge');
+
+  if (!img) return;
+
+  const now = Date.now();
+  if (now - lastCamFetchTime < 1000) return;
+  lastCamFetchTime = now;
+
+  const targetUrl = snapshotUrl || `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${now}`;
+
+  const preloader = new Image();
+  preloader.onload = () => {
+    img.src = targetUrl;
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
+    if (fpsBadge) fpsBadge.textContent = 'CLOUD LIVE';
+  };
+  preloader.onerror = () => {
+    if (!img.src.includes('assets/')) {
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+    }
+    if (fpsBadge) fpsBadge.textContent = 'STANDBY';
+  };
+  preloader.src = targetUrl;
+}
+
 function updateCameraFeed(force = false) {
   const p = STATE.printers[STATE.activePrinterId];
   if (!p) return;
 
-  const img = document.getElementById('cameraStreamImg');
   const hudName = document.getElementById('hudCamName');
-  const blockedOverlay = document.getElementById('cameraBlockedOverlay');
-  const blockedUrlDisplay = document.getElementById('blockedUrlDisplay');
-  const fpsBadge = document.getElementById('cameraFpsBadge');
-  const snapModeLabel = document.getElementById('snapModeLabel');
-
-  if (!img) return;
-
-  const streamUrl = p.camStreamUrl || `http://${p.ip}/webcam/?action=stream`;
-  const snapshotUrl = p.camSnapshotUrl || `http://${p.ip}/webcam/?action=snapshot`;
-
   if (hudName) {
     hudName.textContent = STATE.activePrinterId === 'p1' 
       ? `CAM 1: QIDI HD (${p.ip})` 
-      : `CAM 2: CoreXY Feed (${p.ip}:8080)`;
+      : `CAM 2: Fleet Slot 2`;
   }
 
-  if (blockedUrlDisplay) {
-    blockedUrlDisplay.textContent = streamUrl;
-  }
-
-  // Clear existing snapshot polling
-  if (STATE.camSnapshotInterval) {
-    clearInterval(STATE.camSnapshotInterval);
-    STATE.camSnapshotInterval = null;
-  }
-
-  if (!force && lastCamPrinter === STATE.activePrinterId && STATE.camMode === 'stream') {
+  if (STATE.simMode) {
+    const img = document.getElementById('cameraStreamImg');
+    if (img) img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
+    const fpsBadge = document.getElementById('cameraFpsBadge');
+    if (fpsBadge) fpsBadge.textContent = 'DEMO';
     return;
   }
-  lastCamPrinter = STATE.activePrinterId;
 
-  // Remove handlers
-  img.onerror = null;
-  img.onload = null;
-
-  if (STATE.camMode === 'stream') {
-    if (snapModeLabel) snapModeLabel.textContent = 'Snapshot Mode';
-    if (fpsBadge) fpsBadge.textContent = '15 FPS';
-
-    img.onerror = () => {
-      console.warn('Camera feed failed or blocked by browser mixed-content:', streamUrl);
-      if (blockedOverlay) blockedOverlay.style.display = 'flex';
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
-      if (fpsBadge) fpsBadge.textContent = 'BLOCKED (HTTPS)';
-    };
-
-    img.onload = () => {
-      if (!img.src.includes('assets/')) {
-        if (blockedOverlay) blockedOverlay.style.display = 'none';
-        if (fpsBadge) fpsBadge.textContent = 'LIVE';
-      }
-    };
-
-    img.src = streamUrl;
-  } else if (STATE.camMode === 'snapshot') {
-    if (snapModeLabel) snapModeLabel.textContent = 'Stream Mode';
-    if (fpsBadge) fpsBadge.textContent = 'SNAP (1.5s)';
-
-    const pollSnapshot = () => {
-      const cacheBust = Date.now();
-      const testImg = new Image();
-      testImg.onload = () => {
-        img.src = `${snapshotUrl}?t=${cacheBust}`;
-        if (blockedOverlay) blockedOverlay.style.display = 'none';
-        if (fpsBadge) fpsBadge.textContent = 'SNAP (1.5s)';
-      };
-      testImg.onerror = () => {
-        if (blockedOverlay) blockedOverlay.style.display = 'flex';
-        img.src = STATE.activePrinterId === 'p1' ? 'assets/print_thumbnail.jpg' : 'assets/printer2_standby.jpg';
-        if (fpsBadge) fpsBadge.textContent = 'BLOCKED (HTTPS)';
-      };
-      testImg.src = `${snapshotUrl}?t=${cacheBust}`;
-    };
-
-    pollSnapshot();
-    STATE.camSnapshotInterval = setInterval(pollSnapshot, 1500);
-  }
+  updateBridgeCamera(p.snapshotUrl);
 }
 
 function updateLatency(ms) {
@@ -616,9 +581,14 @@ function renderFocusView() {
   if (heroCurLayer) heroCurLayer.textContent = p.currentLayer;
   if (heroTotLayer) heroTotLayer.textContent = p.totalLayer;
   if (heroPercent) heroPercent.textContent = `${p.progress}%`;
-  if (heroProgressBar) heroProgressBar.style.width = `${Math.min(100, Math.max(0, p.progress))}%`;
-
-  if (heroElapsed) heroElapsed.textContent = formatDuration(p.elapsedSeconds);
+  if (heroProgressBar) {
+    heroProgressBar.style.width = `${Math.min(100, Math.max(0, p.progress))}%`;
+    if (p.online && p.state === 'printing') {
+      heroProgressBar.classList.add('animating');
+    } else {
+      heroProgressBar.classList.remove('animating');
+    }
+  }
   if (heroRemaining) heroRemaining.textContent = formatDuration(Math.max(0, p.totalDurationSeconds - p.elapsedSeconds));
   if (heroFilament) heroFilament.textContent = `${(p.filamentUsedMm / 1000).toFixed(2)} m`;
   if (heroTotalTime) heroTotalTime.textContent = formatDuration(p.totalDurationSeconds);
@@ -992,7 +962,8 @@ function initEventListeners() {
   // Banner Guide Button & Close
   document.getElementById('bannerQuickGuideBtn')?.addEventListener('click', openGuideModal);
   document.getElementById('bannerCloseBtn')?.addEventListener('click', () => {
-    document.getElementById('networkBanner').style.display = 'none';
+    const b = document.getElementById('bridgeBanner') || document.getElementById('networkBanner');
+    if (b) b.style.display = 'none';
   });
 
   // Modals

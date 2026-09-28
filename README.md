@@ -1,70 +1,106 @@
-# NEXUS 3D — Multi-Printer Monitoring & Telemetry Hub
+# NEXUS 3D — Remote Fleet Telemetry & Monitoring System
 
-A real-time 3D printer monitoring and telemetry application built for Klipper/Moonraker and OctoPrint printers, optimized for **Pantheon WebOps Hosting** and direct LAN/tunnel communication.
+A next-generation, non-invasive 3D printer monitoring and telemetry application built for Klipper/Moonraker printers, powered by a **two-tier architecture**:
+
+1. **Pantheon Cloud Web App** (PHP 8.2 backend + HTML/JS/CSS frontend)
+   - Secure session-based authentication protecting all routes (`admin` / `nexus3d`).
+   - Dynamic telemetry ingestion API (`/index.php?route=api&action=push`).
+   - High-performance, zero-latency JPEG snapshot delivery over HTTPS.
+   - Sleek Dark / Light theme toggle with state persistent in `localStorage`.
+   - Polished circular temperature gauges with zero clipping and state-synchronized progress animation.
+   - Fleet expansion slot ready for future printers.
+
+2. **Local Desktop Bridge Daemon** (Zero-Dependency Python 3.8+)
+   - **Zero printer modifications**: No firmware, Klipper configs, or Moonraker files are modified on any printer.
+   - Passively polls read-only HTTP GET endpoints on your LAN (`192.168.1.124` QIDI Q2).
+   - Captures live webcam snapshots and relays them via Bearer-authenticated HTTPS POSTs to Pantheon.
+   - Cross-platform: Runs silently in the background on Windows, macOS, or Linux/Raspberry Pi.
+   - **All-in-One USB Installer Wizard**: Includes automated portable Python runtime downloader, interactive setup wizard, connectivity diagnostics, and automatic Windows Startup / Linux systemd service registration.
 
 ---
 
-## 🖨️ Configured Printers
+## 🏗️ Architecture & Data Flow
 
-| Printer Name | Local IP Address | Port | Firmware / API | Initial Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **Printer 01 (QIDI X-Series)** | `192.168.1.124` | `7125` / `80` | Klipper / Moonraker v1.4 | **Online & Printing** (`qidi-box-ams-snap-base`) |
-| **Printer 02 (CoreXY Pro)** | `192.168.1.36` | `7125` | Klipper / Moonraker | **Standby / Offline** (Pingable / Configurable) |
-
----
-
-## 🚀 Deploying to Pantheon WebOps Hosting
-
-This repository includes `pantheon.yml` and `index.php` preconfigured for Pantheon's Git-based deployment workflow.
-
-### 1. Initialize Git in this directory (if not already done)
-```bash
-git init
-git add .
-git commit -m "Deploy NEXUS 3D Monitoring System to Pantheon"
+```mermaid
+graph LR
+    subgraph "Home LAN (192.168.1.x)"
+        P1["QIDI Q2<br>192.168.1.124"]
+        Bridge["Desktop Bridge Daemon<br>(Silent Background Process)"]
+    end
+    subgraph "Pantheon WebOps Cloud"
+        API["Ingestion API<br>(Bearer Token Auth)"]
+        Store["Filesystem Store<br>(files/nexus3d/telemetry)"]
+        UI["Authenticated Dashboard<br>(HTTPS Anywhere)"]
+    end
+    P1 -- "Read-only HTTP GET<br>Objects Query & MJPEG" --> Bridge
+    Bridge -- "HTTPS POST (Relay)<br>Every 2 seconds" --> API
+    API -- "Atomic Write" --> Store
+    UI -- "AJAX Poll<br>/api&action=latest" --> API
 ```
 
-### 2. Connect to your Pantheon Site Repository
-In your Pantheon Dashboard, navigate to your site's **Dev** tab and copy your Git connection string:
-```bash
-git remote add pantheon ssh://codeserver.dev.{site-uuid}@codeserver.dev.{site-uuid}.drush.in:2222/~/repository.git
-```
+---
 
-### 3. Push to Pantheon
-```bash
-git push pantheon master
-```
+## ⚡ Quick Start: 1-Click USB Installer
 
-Once pushed, your app is immediately live on your Pantheon URL:
-`https://dev-{site-name}.pantheonsite.io`
+You only need to run the installer **once** on any computer connected to the same Wi-Fi / LAN as your QIDI Q2 printer:
+
+1. Copy the `installer_usb/` folder to a USB drive or directly to the LAN desktop.
+2. Run the installer:
+   - **Windows**: Double-click `install.bat`
+   - **Linux / Raspberry Pi**: Run `sudo bash install.sh`
+3. The Setup Wizard will:
+   - Verify Python (automatically downloads portable runtime if missing).
+   - Pre-fill smart defaults for your Pantheon URL, API token, and QIDI Q2 IP (`192.168.1.124`).
+   - Run live diagnostic probes against your printer, webcam, and Pantheon.
+   - Register the bridge to start automatically on system boot.
+   - Launch the bridge daemon immediately!
 
 ---
 
-## 🌐 Network Architecture & Connecting to Local Printers
+## 🌐 Accessing Your Cloud Dashboard
 
-Because Pantheon is hosted in the cloud while your 3D printers (`192.168.1.124` and `192.168.1.36`) reside on your local private network, the application uses **client-side direct browser communication**:
+Open your Pantheon URL on any browser, mobile phone, or laptop worldwide:
+```
+https://dev-nexus3-d.pantheonsite.io/
+```
 
-1. **Direct LAN Link**: When you open the website on your computer/laptop, your browser is on the same local network as your printers. The browser communicates directly with `http://192.168.1.124:7125` and `http://192.168.1.36:7125`.
-2. **Moonraker CORS Configuration**: To allow the Pantheon domain to query Moonraker, add your Pantheon URL or a wildcard to `moonraker.conf` on your printer:
-   ```ini
-   [authorization]
-   cors_domains:
-       *://*.pantheonsite.io
-       https://*.pantheonsite.io
-       http://localhost:*
-       http://127.0.0.1:*
-   ```
-   Then restart Moonraker (`sudo systemctl restart moonraker`).
-3. **Remote Access Outside Home (Optional)**: If you want to check your prints from your phone when away from home, you can configure a free **Cloudflare Tunnel**, **Tailscale Funnel**, or **Ngrok** endpoint in the in-app **Settings** modal.
+- **Default Username**: `admin`
+- **Default Password**: `nexus3d`
 
 ---
 
-## 🛠️ Key Features
-- **Real-Time Telemetry**: Extruder (actual vs target), Heated Bed (actual vs target), Chamber temperature, power percentages.
-- **Dynamic Temperature Graph**: HTML5 Canvas graphing live thermal history with target thresholds.
-- **2D Bed & Toolhead Visualizer**: Real-time rendering of nozzle position across the 275×295mm build volume.
-- **Full Kinematics & Axis Jogging**: Diamond X/Y controls, Z vertical control, step sizes (0.1, 1, 10, 50, 100mm), Home All (`G28`).
-- **Live G-Code Terminal**: Direct command dispatch (`M105`, `M114`, `M84`, custom macros) with live color-coded logging.
-- **Dual Fleet Overview**: Split view to monitor both printers simultaneously.
-- **Emergency Stop (M112)**: Instant safety trigger to cut all heaters and freeze stepper motors.
-- **Simulation Mode**: Built-in test simulation for offline environments and testing.
+## 📂 Project Structure
+
+```
+TestProject/
+├── index.php                 # Central router & session auth gateway
+├── dashboard.html            # Authenticated fleet monitoring dashboard
+├── login.html                # Branded login interface
+├── app.js                    # Telemetry rendering, theme toggle & polling logic
+├── style.css                 # Dark & Light theme styling system
+├── pantheon.yml              # Pantheon deployment & path protection rules
+├── assets/                   # Static thumbnails & brand assets
+├── private/
+│   ├── config.php            # Security secrets, API token, filesystem paths
+│   ├── auth.php              # Login credentials verification & session setter
+│   └── api.php               # Ingestion (push), query (latest), & snapshot serve
+└── installer_usb/
+    ├── install.bat           # 1-click Windows installer with portable Python downloader
+    ├── setup_wizard.py       # Interactive terminal wizard with live network diagnostics
+    ├── bridge_daemon.py      # Standalone passive relay daemon (zero dependencies)
+    ├── start_bridge.bat      # Manual background launcher
+    ├── stop_bridge.bat       # Process stopper
+    ├── status.bat            # Live status & log inspector
+    ├── install.sh            # Linux/systemd auto-start installer
+    ├── config.env.example    # Configuration reference
+    └── README_USB.txt        # Plain-text flash drive documentation
+```
+
+---
+
+## 🔒 Security & Non-Invasive Guarantees
+
+- **No Printer Modifications**: Printers remain 100% stock with factory security policies intact.
+- **Ingestion Protection**: Bridge-to-cloud telemetry writes require a shared secret Bearer API token.
+- **Frontend Protection**: The web dashboard is strictly gated behind bcrypt-hashed password sessions.
+- **Zero Mixed-Content Errors**: Camera snapshots are delivered directly over HTTPS from Pantheon.
