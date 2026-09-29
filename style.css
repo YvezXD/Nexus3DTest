@@ -552,6 +552,77 @@ body.light-theme .speed-row .speed-val {
   font-weight: 700;
 }
 
+/* Progress Bar Track in Light Mode */
+body.light-theme .progress-bar-track {
+  background: rgba(15, 23, 42, 0.09);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+/* Chamber Temperature in Light Mode */
+body.light-theme .chamber-temp-val,
+body.light-theme .chamber-temp-val .sub-deg {
+  color: var(--text-main);
+}
+
+/* G-Code Terminal in Light Mode */
+body.light-theme .terminal-body {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+body.light-theme .term-line.info {
+  color: #334155;
+}
+
+body.light-theme .term-line.success {
+  color: #047857;
+  font-weight: 600;
+}
+
+body.light-theme .term-line.warning {
+  color: #b45309;
+  font-weight: 600;
+}
+
+body.light-theme .term-line.error {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+body.light-theme .term-line.echo {
+  color: #0284c7;
+  font-weight: 600;
+}
+
+body.light-theme .term-time,
+body.light-theme .term-line .term-time {
+  color: #64748b;
+}
+
+body.light-theme .terminal-input-row {
+  background: #ffffff;
+  border-top: 1px solid var(--border-subtle);
+}
+
+body.light-theme .term-prompt {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+body.light-theme .term-input {
+  color: #0f172a;
+  background: transparent;
+}
+
+body.light-theme .term-input::placeholder {
+  color: #94a3b8;
+}
+
+body.light-theme .terminal-macros {
+  background: #f1f5f9;
+  border-top: 1px solid var(--border-subtle);
+}
+
 /* Glassmorphism utility */
 .card-glass {
   background: var(--bg-card);

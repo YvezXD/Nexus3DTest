@@ -155,14 +155,14 @@ def query_moonraker(printer):
         ps = status["print_stats"]
         telemetry["state"] = ps.get("state", "ready").lower()
         telemetry["filename"] = ps.get("filename", "None (Standby)")
-        telemetry["filamentUsedMm"] = round(float(ps.get("filament_used", 0.0)), 1)
-        dur = ps.get("print_duration", ps.get("total_duration", 0.0))
+        telemetry["filamentUsedMm"] = round(float(ps.get("filament_used") or 0.0), 1)
+        dur = ps.get("print_duration") or ps.get("total_duration") or 0.0
         telemetry["elapsedSeconds"] = round(float(dur), 0)
 
         info = ps.get("info", {})
-        if info:
-            telemetry["currentLayer"] = int(info.get("current_layer", 0))
-            telemetry["totalLayer"] = int(info.get("total_layer", 0))
+        if isinstance(info, dict):
+            telemetry["currentLayer"] = int(info.get("current_layer") or 0)
+            telemetry["totalLayer"] = int(info.get("total_layer") or 0)
 
     # Progress calculation matching Fluidd / Moonraker
     prog = 0.0
