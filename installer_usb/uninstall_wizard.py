@@ -92,6 +92,25 @@ def remove_autostart():
     removed = False
 
     if sys.platform == "win32":
+        # Remove from Registry Run key
+        try:
+            import winreg
+            reg_key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_SET_VALUE
+            )
+            winreg.DeleteValue(reg_key, "Nexus3DBridge")
+            winreg.CloseKey(reg_key)
+            print(f"  {C.GREEN}[OK]{C.RESET} Removed Windows Startup Registry Run key")
+            removed = True
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"  {C.YELLOW}[WARNING]{C.RESET} Could not remove Registry Run key: {e}")
+
+        # Remove from Startup folder
         try:
             startup_dir = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
             vbs_path = os.path.join(startup_dir, "Nexus3DBridge.vbs")

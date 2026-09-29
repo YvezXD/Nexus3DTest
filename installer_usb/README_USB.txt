@@ -40,12 +40,14 @@ Follow these simple steps on the computer located on your home network:
 ========================================================================
  HELPER UTILITIES:
 ========================================================================
-- start_bridge.bat : Starts the bridge manually if ever stopped.
-- stop_bridge.bat  : Gracefully stops the bridge process.
-- status.bat       : Shows if the bridge is currently running and tails
-                     the latest log output.
-- uninstall.bat    : Uninstalls the bridge daemon, removes Windows Startup
-                     launcher, and cleans up local configuration.
-- uninstall.sh     : Uninstalls the daemon on Linux / Raspberry Pi.
-- bridge.log       : Text file containing all recent activity logs.
+- start_bridge.bat       : Starts the bridge manually if ever stopped.
+- stop_bridge.bat        : Gracefully stops the bridge process.
+- status.bat             : Shows if the bridge is currently running and tails
+                           the latest log output.
+- enable_autostart.bat   : One-click enables automatic startup on Windows boot.
+- disable_autostart.bat  : Disables automatic startup on Windows boot.
+- uninstall.bat          : Uninstalls the bridge daemon, removes Windows Startup
+                           launcher, and cleans up local configuration.
+- uninstall.sh           : Uninstalls the daemon on Linux / Raspberry Pi.
+- bridge.log             : Text file containing all recent activity logs.
 ========================================================================

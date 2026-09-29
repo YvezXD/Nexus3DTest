@@ -15,7 +15,9 @@ import sys
 import time
 import json
 import base64
+import socket
 import logging
+import subprocess
 import urllib.request
 import urllib.error
 from urllib.parse import urlparse
@@ -89,6 +91,132 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("NexusBridge")
+
+# ─── Single-Instance Protection ───
+_instance_socket = None
+
+def acquire_single_instance_lock(port=58921):
+    """
+    Binds to localhost:58921 to ensure only one bridge daemon runs at a time.
+    Prevents duplicate background instances when auto-started.
+    """
+    global _instance_socket
+    try:
+        _instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        _instance_socket.bind(("127.0.0.1", port))
+        _instance_socket.listen(1)
+        return True
+    except (socket.error, OSError):
+        return False
+
+# ─── Windows / Cross-Platform Auto-Start Registration ───
+
+def ensure_autostart(enable=True):
+    r"""
+    Configures the bridge daemon to start automatically when Windows boots.
+    Uses multi-layer registration:
+      1. Windows Registry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
+      2. Windows Startup folder silent launcher (.vbs)
+      3. Linux systemd user service (if running on Linux)
+    """
+    script_path = os.path.abspath(__file__)
+    script_dir = os.path.dirname(script_path)
+
+    if sys.platform == "win32":
+        try:
+            import winreg
+
+            # Detect pythonw.exe to run without a black console window
+            python_exe = sys.executable
+            pythonw_exe = python_exe.replace("python.exe", "pythonw.exe")
+            exec_bin = pythonw_exe if os.path.exists(pythonw_exe) else python_exe
+
+            run_cmd = f'"{exec_bin}" "{script_path}"'
+
+            # Layer 1: Windows Registry Run Key
+            try:
+                reg_key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Run",
+                    0,
+                    winreg.KEY_SET_VALUE | winreg.KEY_READ
+                )
+                if enable:
+                    winreg.SetValueEx(reg_key, "Nexus3DBridge", 0, winreg.REG_SZ, run_cmd)
+                    logger.info(f"Registered Windows Startup Registry Run key: {run_cmd}")
+                else:
+                    try:
+                        winreg.DeleteValue(reg_key, "Nexus3DBridge")
+                        logger.info("Removed Windows Startup Registry Run key.")
+                    except FileNotFoundError:
+                        pass
+                winreg.CloseKey(reg_key)
+            except Exception as e:
+                logger.warning(f"Registry auto-start configuration: {e}")
+
+            # Layer 2: Windows Startup Folder (Silent VBScript Launcher)
+            startup_dir = os.path.join(
+                os.environ.get("APPDATA", ""),
+                "Microsoft", "Windows", "Start Menu", "Programs", "Startup"
+            )
+            if os.path.exists(startup_dir):
+                vbs_path = os.path.join(startup_dir, "Nexus3DBridge.vbs")
+                if enable:
+                    vbs_code = f'''Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = "{script_dir}"
+WshShell.Run """{exec_bin}"" ""{script_path}""", 0, False
+'''
+                    with open(vbs_path, "w", encoding="utf-8") as f:
+                        f.write(vbs_code)
+                    logger.info(f"Verified Windows Startup folder launcher: {vbs_path}")
+                else:
+                    if os.path.exists(vbs_path):
+                        os.remove(vbs_path)
+                        logger.info("Removed Windows Startup folder launcher.")
+
+            return True
+        except Exception as e:
+            logger.warning(f"Could not configure Windows startup auto-run: {e}")
+            return False
+
+    elif sys.platform.startswith("linux"):
+        service_file = os.path.expanduser("~/.config/systemd/user/nexus3d-bridge.service")
+        if enable:
+            try:
+                os.makedirs(os.path.dirname(service_file), exist_ok=True)
+                service_content = f"""[Unit]
+Description=NEXUS 3D Telemetry Bridge Daemon
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={script_dir}
+ExecStart={sys.executable} {script_path}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+"""
+                with open(service_file, "w", encoding="utf-8") as f:
+                    f.write(service_content)
+                subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+                subprocess.run(["systemctl", "--user", "enable", "--now", "nexus3d-bridge.service"], check=False)
+                logger.info(f"Linux user systemd service enabled: {service_file}")
+                return True
+            except Exception as e:
+                logger.warning(f"Could not configure Linux systemd user service: {e}")
+        else:
+            if os.path.exists(service_file):
+                try:
+                    subprocess.run(["systemctl", "--user", "stop", "nexus3d-bridge.service"], check=False)
+                    subprocess.run(["systemctl", "--user", "disable", "nexus3d-bridge.service"], check=False)
+                    os.remove(service_file)
+                    subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+                    logger.info("Linux user systemd service removed.")
+                except Exception as e:
+                    logger.warning(f"Could not remove Linux user service: {e}")
+    return False
 
 # ─── Telemetry Harvester ───
 
@@ -383,6 +511,31 @@ def run_bridge():
         time.sleep(sleep_time)
 
 if __name__ == "__main__":
+    # 1. CLI Commands for manual toggle
+    if "--enable-autostart" in sys.argv or "--install-autostart" in sys.argv:
+        print("[*] Configuring NEXUS 3D Bridge Daemon to auto-run on Windows startup...")
+        if ensure_autostart(True):
+            print("[OK] Auto-run on Windows startup has been successfully enabled!")
+        else:
+            print("[ERROR] Could not configure auto-run.")
+        sys.exit(0)
+
+    if "--disable-autostart" in sys.argv or "--uninstall-autostart" in sys.argv:
+        print("[*] Disabling NEXUS 3D Bridge Daemon Windows auto-run...")
+        ensure_autostart(False)
+        print("[OK] Auto-run on Windows startup has been removed.")
+        sys.exit(0)
+
+    # 2. Single-Instance Protection: prevent duplicate background processes
+    if not acquire_single_instance_lock():
+        logger.info("Another instance of NEXUS 3D Bridge Daemon is already running. Exiting cleanly.")
+        sys.exit(0)
+
+    # 3. Automatically ensure auto-start registration on every launch (self-enrolling)
+    auto_start_on_boot = os.environ.get("AUTO_START_ON_BOOT", "true").lower() == "true"
+    if auto_start_on_boot:
+        ensure_autostart(True)
+
     try:
         run_bridge()
     except KeyboardInterrupt:

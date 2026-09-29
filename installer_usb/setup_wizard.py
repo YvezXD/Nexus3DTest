@@ -137,26 +137,14 @@ def test_pantheon(url, token):
         return False
 
 def configure_auto_start(script_dir):
-    """Sets up auto-start on Windows (Startup folder .vbs) or Linux (systemd)."""
-    if sys.platform == "win32":
-        try:
-            startup_dir = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
-            if os.path.exists(startup_dir):
-                daemon_py = os.path.join(script_dir, "bridge_daemon.py")
-                python_exe = sys.executable
-                
-                # Create silent VBScript launcher (no black console window!)
-                vbs_path = os.path.join(startup_dir, "Nexus3DBridge.vbs")
-                vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = "{script_dir}"
-WshShell.Run """{python_exe}"" ""{daemon_py}""", 0, False
-'''
-                with open(vbs_path, "w", encoding="utf-8") as f:
-                    f.write(vbs_content)
-                print(f"  {C.GREEN}[OK]{C.RESET} Registered background startup launcher in Windows Startup")
-                return True
-        except Exception as e:
-            print(f"  {C.YELLOW}[WARNING]{C.RESET} Could not register startup task: {e}")
+    """Sets up auto-start on Windows (Registry Run key + Startup folder) or Linux (systemd)."""
+    try:
+        import bridge_daemon
+        if bridge_daemon.ensure_autostart(True):
+            print(f"  {C.GREEN}[OK]{C.RESET} Registered automatic startup on Windows boot (Registry Run key + Startup folder)")
+            return True
+    except Exception as e:
+        print(f"  {C.YELLOW}[WARNING]{C.RESET} Could not register startup task: {e}")
     elif sys.platform.startswith("linux"):
         try:
             service_path = "/etc/systemd/system/nexus3d-bridge.service"

@@ -35,7 +35,10 @@ echo [*] Running direct Windows cleanup...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like '*bridge_daemon.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host 'Stopped PID:' $_.ProcessId }"
 
-:: Remove startup launcher
+:: Remove startup launcher and Registry Run key
+reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "Nexus3DBridge" /f >nul 2>&1
+echo [OK] Removed Windows Registry startup entry.
+
 set "STARTUP_VBS=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Nexus3DBridge.vbs"
 if exist "%STARTUP_VBS%" (
     del /f /q "%STARTUP_VBS%"
