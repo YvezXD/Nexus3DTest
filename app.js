@@ -519,7 +519,7 @@ function updateCameraFeed(forceReload = false) {
 
   if (STATE.simMode) {
     if (camSnapshotPoller) { clearInterval(camSnapshotPoller); camSnapshotPoller = null; }
-    img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
+    img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
     if (fpsBadge) fpsBadge.textContent = 'DEMO';
     if (standbyOverlay) standbyOverlay.style.display = 'none';
     return;
@@ -603,7 +603,7 @@ function loadSingleCloudSnapshot(customUrl = null) {
   };
   preloader.onerror = () => {
     if (!img.src || img.src.includes('about:blank')) {
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
     }
     if (fpsBadge) fpsBadge.textContent = 'STANDBY';
   };
@@ -719,6 +719,10 @@ function renderDualFleet() {
   const fc2Img = document.getElementById('fc2Img');
   const fc2Overlay = document.getElementById('fc2Overlay');
 
+  if (fc2Img && !fc2Img.src.includes('KK3.webp')) {
+    fc2Img.src = 'assets/KK3.webp';
+  }
+
   if (p2.online) {
     if (fc2Dot) fc2Dot.className = 'status-indicator-dot online';
     if (fc2Badge) {
@@ -753,7 +757,7 @@ function renderFocusView() {
   // Hero Card
   const heroThumb = document.getElementById('heroThumb');
   if (heroThumb) {
-    const targetThumb = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/printer2_standby.jpg';
+    const targetThumb = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
     if (!heroThumb.src.includes(targetThumb)) {
       heroThumb.src = targetThumb;
     }
