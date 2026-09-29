@@ -791,9 +791,11 @@ body.light-theme .pref-hint {
 .main-container,
 .top-nav,
 .focus-dashboard-container,
+#focusContainer,
 .dual-fleet-container {
   width: 100%;
   max-width: 100vw;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -2163,13 +2165,16 @@ body.light-theme .reading-meter-fill.fan-fill {
 /* ==================== WORKSPACE GRID ==================== */
 .workspace-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1100px) {
   .workspace-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2177,18 +2182,38 @@ body.light-theme .reading-meter-fill.fan-fill {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#cameraPanel,
+#terminalPanel {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .column-left {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .column-right {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .panel-header {
@@ -2281,22 +2306,30 @@ body.light-theme .reading-meter-fill.fan-fill {
 /* Camera Stream */
 .camera-view-body {
   position: relative;
-  min-height: 350px;
+  min-height: 240px;
   background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .stream-wrapper {
   position: relative;
   width: 100%;
+  max-width: 100%;
   height: 350px;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
-.live-stream-feed {
+.live-stream-feed,
+#cameraStreamImg {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
@@ -2713,6 +2746,10 @@ body.light-theme .reading-meter-fill.fan-fill {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .terminal-body {
@@ -2723,14 +2760,22 @@ body.light-theme .reading-meter-fill.fan-fill {
   font-family: var(--font-mono);
   font-size: 0.76rem;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .term-line {
   line-height: 1.4;
   word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  max-width: 100%;
 }
 
 .term-line.info { color: #94a3b8; }
@@ -2785,12 +2830,17 @@ body.light-theme .reading-meter-fill.fan-fill {
   color: #fff;
 }
 
-.terminal-input-row {
+.terminal-input-row,
+#terminalForm {
   display: flex;
   align-items: center;
   background: #080d18;
   border-top: 1px solid var(--border-subtle);
   padding: 0.4rem 0.8rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .term-prompt {
@@ -2798,16 +2848,22 @@ body.light-theme .reading-meter-fill.fan-fill {
   color: var(--accent-cyan);
   font-weight: 700;
   margin-right: 0.5rem;
+  flex-shrink: 0;
 }
 
-.term-input {
-  flex: 1;
+.term-input,
+#terminalInput {
+  flex: 1 1 0%;
+  width: 0;
+  min-width: 0;
+  max-width: 100%;
   background: transparent;
   border: none;
   color: #fff;
   font-family: var(--font-mono);
   font-size: 0.82rem;
   outline: none;
+  box-sizing: border-box;
 }
 
 .term-send-btn {
@@ -3439,11 +3495,15 @@ body.light-theme .reading-meter-fill.fan-fill {
     overflow: hidden;
   }
 
-  .panel-card {
+  .panel-card,
+  #cameraPanel,
+  #terminalPanel {
     min-width: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    box-sizing: border-box;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
 
   .panel-header {
@@ -3471,8 +3531,9 @@ body.light-theme .reading-meter-fill.fan-fill {
 
   .panel-actions {
     display: flex;
+    flex-wrap: wrap !important;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     width: 100%;
     gap: 0.4rem;
   }
@@ -3485,6 +3546,55 @@ body.light-theme .reading-meter-fill.fan-fill {
     justify-content: center;
   }
 
+  /* Camera Mobile */
+  .camera-view-body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .stream-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .live-stream-feed,
+  #cameraStreamImg {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+    display: block;
+  }
+
+  .bed-visualizer-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 220px;
+    box-sizing: border-box;
+  }
+
+  #bedCanvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .bed-legend {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
   #tempCanvas {
     width: 100% !important;
     max-width: 100% !important;
@@ -3492,10 +3602,16 @@ body.light-theme .reading-meter-fill.fan-fill {
     display: block;
   }
 
-  /* Terminal */
+  /* Terminal Mobile */
   .terminal-body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     height: 260px !important;
     font-size: 0.74rem;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    box-sizing: border-box;
   }
 
   .terminal-macros {
@@ -3506,6 +3622,7 @@ body.light-theme .reading-meter-fill.fan-fill {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
@@ -3517,20 +3634,27 @@ body.light-theme .reading-meter-fill.fan-fill {
     flex-shrink: 0;
   }
 
-  .terminal-input-row {
+  .terminal-input-row,
+  #terminalForm {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     padding: 0.5rem 0.75rem;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    min-width: 0;
   }
 
-  .term-input {
+  .term-input,
+  #terminalInput {
     min-height: 44px;
     font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 0% !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
   }
 
   .term-send-btn {
@@ -3557,6 +3681,60 @@ body.light-theme .reading-meter-fill.fan-fill {
   .form-row {
     flex-direction: column;
     gap: 0.75rem;
+  }
+}
+
+/* ──────────────────── RESPONSIVE CAMERA & TERMINAL OVERRIDES (max-width: 600px) ──────────────────── */
+@media (max-width: 600px) {
+  #cameraPanel, 
+  #terminalPanel {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .live-stream-feed,
+  #cameraStreamImg,
+  .camera-view-body,
+  .terminal-body {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .live-stream-feed,
+  #cameraStreamImg {
+    height: auto !important; /* Maintain aspect ratio for camera */
+    object-fit: contain !important;
+  }
+
+  .camera-view-body {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  .stream-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9;
+  }
+
+  .terminal-body {
+    height: 240px !important;
+    overflow-x: hidden !important;
+  }
+
+  #terminalInput {
+    width: calc(100% - 40px) !important; /* Ensure input fits within terminal form */
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 }
 
@@ -3640,6 +3818,123 @@ body.light-theme .reading-meter-fill.fan-fill {
 
   .job-metrics-row {
     grid-template-columns: 1fr;
+  }
+
+  #cameraPanel,
+  #terminalPanel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .stream-wrapper {
+    aspect-ratio: 16 / 9;
+    min-height: 190px;
+    height: auto !important;
+  }
+
+  .live-stream-feed,
+  #cameraStreamImg {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+
+  .terminal-body {
+    height: 220px !important;
+    padding: 0.6rem 0.7rem !important;
+  }
+}
+
+/* ──────────────────── COMPACT MOBILE / 360px VIEWPORT (max-width: 380px) ──────────────────── */
+@media (max-width: 380px) {
+  .main-container {
+    padding: 0 0.5rem !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+
+  #cameraPanel,
+  #terminalPanel {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .panel-header {
+    padding: 0.5rem 0.55rem !important;
+    gap: 0.4rem !important;
+  }
+
+  .panel-tab-btn {
+    padding: 0.3rem 0.4rem !important;
+    font-size: 0.74rem !important;
+    min-height: 44px !important;
+  }
+
+  .panel-actions {
+    gap: 0.25rem !important;
+  }
+
+  .panel-actions .panel-icon-btn {
+    min-height: 40px !important;
+    min-width: 40px !important;
+    padding: 0.3rem !important;
+  }
+
+  .panel-actions .fps-badge {
+    font-size: 0.68rem !important;
+    padding: 0.2rem 0.35rem !important;
+  }
+
+  .stream-wrapper {
+    aspect-ratio: 16 / 9;
+    min-height: 175px;
+    height: auto !important;
+  }
+
+  .live-stream-feed,
+  #cameraStreamImg {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+  }
+
+  .terminal-body {
+    height: 210px !important;
+    padding: 0.5rem 0.55rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  .terminal-macros {
+    padding: 0.35rem 0.5rem !important;
+    gap: 0.25rem !important;
+  }
+
+  .macro-btn {
+    padding: 0.3rem 0.5rem !important;
+    font-size: 0.7rem !important;
+    min-height: 40px !important;
+  }
+
+  .terminal-input-row {
+    padding: 0.35rem 0.5rem !important;
+    gap: 0.3rem !important;
+  }
+
+  #terminalInput {
+    width: calc(100% - 65px) !important;
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    font-size: 16px !important;
+  }
+
+  .term-send-btn {
+    padding: 0 0.75rem !important;
+    min-height: 44px !important;
+    font-size: 0.8rem !important;
   }
 }
 
