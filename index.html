@@ -11,9 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.8">
+  <link rel="stylesheet" href="style.css?v=2.9">
 </head>
-<body class="dark-theme">
+<body class="light-theme">
 
   <!-- Top Navigation & Global Telemetry Bar -->
   <header class="top-nav" id="topNav">
@@ -49,39 +49,7 @@
 
     <!-- Quick Actions & Config -->
     <div class="nav-controls">
-      <div class="sim-toggle-wrapper" title="Toggle simulation telemetry mode">
-        <span class="toggle-label">Demo Sim</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="simModeToggle" name="simModeToggle" aria-label="Toggle Simulation Mode">
-          <span class="slider round"></span>
-        </label>
-      </div>
-
-      <button class="nav-btn guide-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-        <span id="themeBtnLabel">Light Mode</span>
-      </button>
-
-      <button class="nav-btn guide-btn" id="openGuideBtn" title="Pantheon Hosting & Network Guide">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-          <line x1="12" y1="17" x2="12.01" y2="17"></line>
-        </svg>
-        <span>Pantheon Guide</span>
-      </button>
-
-      <button class="nav-btn config-btn" id="openConfigBtn" title="Configure Printer IPs and Endpoints">
+      <button class="nav-btn config-btn" id="openConfigBtn" title="Configure Printer IPs, Theme, and Preferences">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -886,11 +854,59 @@ cors_domains:
   <div class="modal-backdrop" id="configModal" style="display: none;">
     <div class="modal-window card-glass config-modal-window">
       <div class="modal-header">
-        <h2>Printer Fleet Configuration</h2>
+        <h2>Settings & Fleet Configuration</h2>
         <button class="modal-close-btn" id="closeConfigModal">&times;</button>
       </div>
 
       <div class="modal-body config-body">
+        <!-- Interface & Session Preferences -->
+        <div class="config-section pref-section">
+          <h3 class="config-section-title highlight-cyan">Preferences & Session Controls</h3>
+          <div class="pref-grid">
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Visual Theme</span>
+                <span class="pref-hint">Switch between Light and Dark mode</span>
+              </div>
+              <button type="button" class="nav-btn guide-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <span id="themeBtnLabel">Dark Mode</span>
+              </button>
+            </div>
+
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Demo Simulation</span>
+                <span class="pref-hint">Simulate telemetry if 3D printers are offline</span>
+              </div>
+              <div class="sim-toggle-wrapper" title="Toggle simulation telemetry mode">
+                <span class="toggle-label">Demo Sim</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="simModeToggle" name="simModeToggle" aria-label="Toggle Simulation Mode">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Hosting Guide</span>
+                <span class="pref-hint">Pantheon WebOps setup & mixed-content helper</span>
+              </div>
+              <button type="button" class="nav-btn guide-btn" id="openGuideBtn" title="Pantheon Hosting & Network Guide">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <span>Pantheon Guide</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Printer 1 Settings -->
         <div class="config-section">
           <h3 class="config-section-title highlight-cyan">Printer 01 Settings</h3>
