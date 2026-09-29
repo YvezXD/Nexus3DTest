@@ -70,10 +70,10 @@ PRINTERS = [
 ]
 
 # Optional Printer 2
-if os.environ.get("PRINTER_2_ENABLED", "false").lower() == "true":
+if os.environ.get("PRINTER_2_ENABLED", "true").lower() == "true":
     PRINTERS.append({
         "id": "p2",
-        "name": os.environ.get("PRINTER_2_NAME", "Printer 02 (CoreXY)"),
+        "name": os.environ.get("PRINTER_2_NAME", "FLASHFORGE AD5X"),
         "ip": os.environ.get("PRINTER_2_IP", "192.168.1.36"),
         "port": int(os.environ.get("PRINTER_2_PORT", "7125")),
         "cam_stream": os.environ.get("PRINTER_2_CAM_STREAM", "http://192.168.1.36:8080/?action=stream"),
@@ -245,7 +245,7 @@ def query_moonraker(printer):
         url = base + query_path
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Nexus3D-Bridge/2.0", "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
                 if resp.status == 200:
                     raw_data = json.loads(resp.read().decode("utf-8"))
                     break
@@ -331,19 +331,20 @@ def query_moonraker(printer):
         telemetry["bed"]["target"] = round(float(bed.get("target", 0.0)), 1)
         telemetry["bed"]["power"] = round(float(bed.get("power", 0.0)), 2)
 
-    # Chamber temperature (QIDI Q2 / Klipper heated chamber)
+    # Chamber temperature (Only queried for printers with chamber sensors; FLASHFORGE AD5X has no probe)
     ch_temp = None
-    if "heater_generic chamber" in status:
-        ch_temp = float(status["heater_generic chamber"].get("temperature", 0.0))
-    elif "temperature_sensor Chamber_Thermal_Protection_Sensor" in status:
-        ch_temp = float(status["temperature_sensor Chamber_Thermal_Protection_Sensor"].get("temperature", 0.0))
-    elif "chamber" in status:
-        ch_temp = float(status["chamber"].get("temperature", 0.0))
-    elif "temperature_sensor chamber" in status:
-        ch_temp = float(status["temperature_sensor chamber"].get("temperature", 0.0))
+    if printer.get("id") != "p2":
+        if "heater_generic chamber" in status:
+            ch_temp = float(status["heater_generic chamber"].get("temperature", 0.0))
+        elif "temperature_sensor Chamber_Thermal_Protection_Sensor" in status:
+            ch_temp = float(status["temperature_sensor Chamber_Thermal_Protection_Sensor"].get("temperature", 0.0))
+        elif "chamber" in status:
+            ch_temp = float(status["chamber"].get("temperature", 0.0))
+        elif "temperature_sensor chamber" in status:
+            ch_temp = float(status["temperature_sensor chamber"].get("temperature", 0.0))
 
-    if ch_temp is not None and ch_temp > 0:
-        telemetry["chamber"]["actual"] = round(ch_temp, 1)
+        if ch_temp is not None and ch_temp > 0:
+            telemetry["chamber"]["actual"] = round(ch_temp, 1)
 
     # Toolhead kinematics
     if "toolhead" in status:

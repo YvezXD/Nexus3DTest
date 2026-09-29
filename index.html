@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=2.9">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body class="light-theme">
 
@@ -110,21 +110,17 @@
           </div>
         </button>
 
-        <!-- Tab: Add Future Printer -->
-        <button class="printer-tab add-printer-tab" id="btnAddPrinterTab" title="Add another 3D Printer to Fleet" role="tab" aria-selected="false">
-          <div class="add-printer-plus">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </div>
+        <!-- Tab: FLASHFORGE AD5X (Printer 2) -->
+        <button class="printer-tab" id="tabPrinter2" data-printer="p2" role="tab" aria-selected="false">
+          <div class="tab-indicator status-standby" id="p2TabDot"></div>
           <div class="tab-info">
             <div class="tab-title-row">
-              <span class="tab-name">+ Add Future Printer</span>
-              <span class="tab-state-pill pill-standby">SLOT OPEN</span>
+              <span class="tab-name" id="p2TabName">FLASHFORGE AD5X</span>
+              <span class="tab-state-pill pill-standby" id="p2StatePill">STANDBY</span>
             </div>
             <div class="tab-meta-row">
-              <span class="tab-ip text-dim">Add 2nd Printer / Remote</span>
+              <span class="tab-ip">192.168.1.36</span>
+              <span class="tab-stat-preview" id="p2StatPreview">Standby • 192.168.1.36:7125</span>
             </div>
           </div>
         </button>
@@ -203,23 +199,46 @@
         </div>
       </div>
 
-      <!-- Fleet Card 2: Add Future Printer Slot -->
-      <div class="fleet-card card-glass add-printer-card" id="fleetCard2" style="border-style: dashed; border-color: rgba(255,255,255,0.18); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 2.2rem 1.5rem; min-height: 250px;">
-        <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(0, 242, 254, 0.08); border: 1px dashed var(--accent-cyan); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent-cyan);">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
+      <!-- Fleet Card 2: FLASHFORGE AD5X -->
+      <div class="fleet-card card-glass" id="fleetCard2">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="status-indicator-dot online" id="fc2Dot"></span>
+            <div>
+              <h3 class="card-title">FLASHFORGE AD5X</h3>
+              <span class="card-sub">IP: 192.168.1.36 | Klipper / Moonraker</span>
+            </div>
+          </div>
+          <span class="badge-status-glow standby" id="fc2Badge">OFFLINE / STANDBY</span>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;" class="add-printer-title">+ Add Future Printer</h3>
-        <p style="font-size: 0.82rem; color: var(--text-dim); max-width: 260px; margin-bottom: 1.2rem;">Expand your fleet with another Klipper, Moonraker, or Bambu 3D printer.</p>
-        <button class="btn-sm btn-primary" id="btnFleetAddPrinter">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          Configure Fleet Slot
-        </button>
+        
+        <div class="fleet-card-body">
+          <div class="fleet-thumb-wrap">
+            <img src="assets/printer2_standby.jpg" alt="FLASHFORGE AD5X Preview" class="fleet-thumb-img" id="fc2Img">
+            <div class="thumb-overlay-idle" id="fc2Overlay">
+              <span id="fc2StateText">Ready (Idle)</span>
+            </div>
+          </div>
+          <div class="fleet-summary-meta">
+            <div class="meta-row">
+              <span class="meta-label">Status</span>
+              <span class="meta-value gcode-name" id="fc2Diag">Klipper Connected</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Extruder</span>
+              <span class="meta-value highlight-cyan" id="fc2Extruder">--°C / --°C</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Bed</span>
+              <span class="meta-value highlight-amber" id="fc2Bed">--°C / --°C</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fleet-card-footer">
+          <button class="btn-sm btn-outline select-printer-btn" data-target="p2">Open Details & Controls</button>
+          <button class="btn-sm btn-danger pause-btn-p2">Pause</button>
+        </div>
       </div>
     </section>
 
@@ -447,26 +466,20 @@
           </div>
         </div>
 
-        <!-- Ambient & Chamber Card -->
+        <!-- Speed & Cooling Controls Card -->
         <div class="gauge-card card-glass chamber-card" id="chamberCard">
           <div class="gauge-header">
             <div class="gauge-title-box">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="gauge-icon icon-purple">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
               </svg>
-              <span>CHAMBER & SPEEDS</span>
+              <span>SPEED & COOLING</span>
             </div>
-            <span class="power-tag highlight-purple">Enclosed</span>
+            <span class="power-tag highlight-purple">Overrides</span>
           </div>
 
           <div class="chamber-body">
-            <div class="chamber-readout-item">
-              <span class="chamber-sub">Chamber Temp</span>
-              <div class="chamber-temp-val mono">
-                <span id="chamberTempVal">--</span><span class="sub-deg">°C</span>
-              </div>
-            </div>
-
             <div class="chamber-slider-group">
               <div class="slider-header">
                 <span>Speed Factor</span>
@@ -957,7 +970,7 @@ cors_domains:
           <div class="form-row">
             <div class="form-group flex-2">
               <label for="cfgP2Name">Printer Name</label>
-              <input type="text" id="cfgP2Name" name="cfgP2Name" value="Printer 02 (CoreXY Pro)">
+              <input type="text" id="cfgP2Name" name="cfgP2Name" value="FLASHFORGE AD5X">
             </div>
             <div class="form-group flex-2">
               <label for="cfgP2Ip">Local IP Address</label>

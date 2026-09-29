@@ -44,7 +44,7 @@ const STATE = {
     },
     p2: {
       id: 'p2',
-      name: 'Printer 02 (CoreXY Pro)',
+      name: 'FLASHFORGE AD5X',
       ip: '192.168.1.36',
       port: 7125,
       type: 'moonraker',
@@ -133,7 +133,11 @@ function loadStoredConfig() {
         STATE.printers.p1.camStreamUrl = parsed.printers.p1.camStreamUrl || STATE.printers.p1.camStreamUrl;
         STATE.printers.p1.camSnapshotUrl = parsed.printers.p1.camSnapshotUrl || STATE.printers.p1.camSnapshotUrl;
 
-        STATE.printers.p2.name = parsed.printers.p2.name || STATE.printers.p2.name;
+        if (!parsed.printers.p2.name || parsed.printers.p2.name.includes('CoreXY')) {
+          STATE.printers.p2.name = 'FLASHFORGE AD5X';
+        } else {
+          STATE.printers.p2.name = parsed.printers.p2.name;
+        }
         STATE.printers.p2.ip = parsed.printers.p2.ip || STATE.printers.p2.ip;
         STATE.printers.p2.port = parsed.printers.p2.port || STATE.printers.p2.port;
         STATE.printers.p2.remoteUrl = parsed.printers.p2.remoteUrl || '';
@@ -846,13 +850,6 @@ function renderFocusView() {
   if (valMaxAccel) valMaxAccel.textContent = `${p.toolhead.maxAccel.toLocaleString()} mm/s²`;
   if (valFanSpeed) valFanSpeed.textContent = `${p.toolhead.fan}%`;
 
-  // Chamber & Speeds
-  const chamberVal = document.getElementById('chamberTempVal');
-  if (chamberVal) {
-    const act = (p.chamber && p.chamber.actual !== undefined) ? p.chamber.actual : 0.0;
-    chamberVal.textContent = (typeof act === 'number') ? act.toFixed(1) : act;
-  }
-
   // Stream preview HUD
   const hudTimestamp = document.getElementById('hudTimestamp');
   if (hudTimestamp) {
@@ -1503,6 +1500,7 @@ function resetConfigForm() {
     STATE.printers.p1.camStreamUrl = 'http://192.168.1.124/webcam/?action=stream';
     STATE.printers.p1.camSnapshotUrl = 'http://192.168.1.124/webcam/?action=snapshot';
 
+    STATE.printers.p2.name = 'FLASHFORGE AD5X';
     STATE.printers.p2.ip = '192.168.1.36';
     STATE.printers.p2.port = 7125;
     STATE.printers.p2.camStreamUrl = 'http://192.168.1.36:8080/?action=stream';

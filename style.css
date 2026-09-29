@@ -2013,11 +2013,13 @@ input:checked + .slider:before {
   color: #e2e8f0;
 }
 
-/* Chamber & Speeds Card */
+/* Speeds & Cooling Overrides Card */
 .chamber-body {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 1.15rem;
+  justify-content: center;
+  padding: 0.25rem 0;
 }
 
 .chamber-readout-item {

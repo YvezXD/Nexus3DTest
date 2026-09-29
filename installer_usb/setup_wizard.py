@@ -202,10 +202,10 @@ def main():
 
     # Optional Printer 2
     print(f"\n{C.BOLD}STEP 3: Fleet Expansion{C.RESET}")
-    p2_enabled = ask_bool("Enable a 2nd 3D printer now?", False)
-    p2_name, p2_ip, p2_port, p2_stream, p2_snap = "Printer 02", "192.168.1.36", "7125", "", ""
+    p2_enabled = ask_bool("Enable a 2nd 3D printer now?", True)
+    p2_name, p2_ip, p2_port, p2_stream, p2_snap = "FLASHFORGE AD5X", "192.168.1.36", "7125", "", ""
     if p2_enabled:
-        p2_name = ask("Printer 2 Display Name", "Printer 02 (CoreXY)")
+        p2_name = ask("Printer 2 Display Name", "FLASHFORGE AD5X")
         p2_ip = ask("Printer 2 LAN IP Address", "192.168.1.36")
         p2_port = ask("Printer 2 Moonraker Port", "7125")
         p2_stream = ask("Printer 2 Webcam Stream", f"http://{p2_ip}:8080/?action=stream")
