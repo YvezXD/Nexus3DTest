@@ -2049,6 +2049,81 @@ input:checked + .slider:before {
   color: var(--text-muted);
 }
 
+/* Non-interactable Speed & Cooling Meters */
+.reading-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.reading-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.reading-label {
+  letter-spacing: 0.02em;
+}
+
+.reading-val {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+}
+
+.reading-meter-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  pointer-events: none;
+}
+
+.reading-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reading-meter-fill.speed-fill {
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+}
+
+.reading-meter-fill.fan-fill {
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+}
+
+body.light-theme .reading-header .reading-label {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+body.light-theme .reading-header .reading-val {
+  color: #0284c7;
+  font-weight: 800;
+}
+
+body.light-theme .reading-meter-track {
+  background: #e2e8f0;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+}
+
+body.light-theme .reading-meter-fill.speed-fill {
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+}
+
+body.light-theme .reading-meter-fill.fan-fill {
+  background: linear-gradient(90deg, #0284c7, #06b6d4);
+}
+
 .chamber-slider-group {
   display: flex;
   flex-direction: column;
@@ -2634,9 +2709,15 @@ input:checked + .slider:before {
   color: var(--text-muted);
 }
 
-/* ==================== TERMINAL ==================== */
+#terminalPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .terminal-body {
-  height: 160px;
+  height: 480px;
+  min-height: 380px;
   background: #060911;
   padding: 0.85rem;
   font-family: var(--font-mono);
@@ -3378,7 +3459,7 @@ input:checked + .slider:before {
 
   /* Terminal */
   .terminal-body {
-    height: 140px;
+    height: 250px;
     font-size: 0.74rem;
   }
 

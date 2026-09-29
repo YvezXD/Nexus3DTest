@@ -474,6 +474,11 @@ function simulateTelemetry(isHardwareFallback = false) {
     p1.toolhead.x = parseFloat((centerX + Math.cos(simTick * 0.6) * radius).toFixed(1));
     p1.toolhead.y = parseFloat((centerY + Math.sin(simTick * 0.6) * radius).toFixed(1));
     p1.toolhead.z = parseFloat((24.0 + (Math.sin(simTick * 0.05) * 0.1)).toFixed(2));
+
+    // Chamber temp during print
+    p1.chamber.actual = parseFloat((42.0 + (Math.sin(simTick * 0.05) * 0.6)).toFixed(1));
+  } else {
+    p1.chamber.actual = 28.0;
   }
 
   if (STATE.printers.p2.online) {
@@ -653,7 +658,7 @@ function renderTabs() {
     p1Dot.className = `tab-indicator status-${p1.state === 'printing' ? 'printing' : (p1.online ? 'standby' : 'offline')}`;
   }
   if (p1Prev) {
-    p1Prev.textContent = `L: ${p1.currentLayer}/${p1.totalLayer} • ${p1.extruder.actual}°C / ${p1.bed.actual}°C`;
+    p1Prev.textContent = `${p1.extruder.actual}°C / ${p1.bed.actual}°C`;
   }
   if (p1Tab) {
     p1Tab.classList.toggle('active', STATE.activePrinterId === 'p1');
@@ -693,7 +698,7 @@ function renderDualFleet() {
   // Fleet Card 1
   const fc1Percent = document.getElementById('fc1Percent');
   const fc1File = document.getElementById('fc1File');
-  const fc1Layer = document.getElementById('fc1Layer');
+  const fc1Chamber = document.getElementById('fc1Chamber');
   const fc1Ext = document.getElementById('fc1Extruder');
   const fc1Bed = document.getElementById('fc1Bed');
   const fc1Remain = document.getElementById('fc1Remain');
@@ -704,7 +709,7 @@ function renderDualFleet() {
   }
   if (fc1Percent) fc1Percent.textContent = `${p1.progress}%`;
   if (fc1File) fc1File.textContent = p1.filename;
-  if (fc1Layer) fc1Layer.textContent = `${p1.currentLayer} / ${p1.totalLayer}`;
+  if (fc1Chamber) fc1Chamber.textContent = (p1.chamber && p1.chamber.actual > 0) ? `${p1.chamber.actual.toFixed(1)}°C` : '--';
   if (fc1Ext) fc1Ext.textContent = `${p1.extruder.actual}°C / ${p1.extruder.target}°C`;
   if (fc1Bed) fc1Bed.textContent = `${p1.bed.actual}°C / ${p1.bed.target}°C`;
   if (fc1Remain) fc1Remain.textContent = formatDuration(Math.max(0, p1.totalDurationSeconds - p1.elapsedSeconds));
@@ -765,8 +770,6 @@ function renderFocusView() {
   const heroLiveTag = document.getElementById('heroLiveTag');
   const heroFilename = document.getElementById('heroFilename');
   const heroStateBadge = document.getElementById('heroStateBadge');
-  const heroCurLayer = document.getElementById('heroCurLayer');
-  const heroTotLayer = document.getElementById('heroTotLayer');
   const heroPercent = document.getElementById('heroPercent');
   const heroProgressBar = document.getElementById('heroProgressBar');
   const heroElapsed = document.getElementById('heroElapsed');
@@ -779,8 +782,6 @@ function renderFocusView() {
     heroStateBadge.textContent = p.online ? p.state.toUpperCase() : 'OFFLINE';
     heroStateBadge.className = `badge-state-hero state-${p.online ? p.state : 'standby'}`;
   }
-  if (heroCurLayer) heroCurLayer.textContent = p.currentLayer;
-  if (heroTotLayer) heroTotLayer.textContent = p.totalLayer;
   if (heroPercent) heroPercent.textContent = `${p.progress}%`;
   if (heroProgressBar) {
     heroProgressBar.style.width = `${Math.min(100, Math.max(0, p.progress))}%`;
@@ -853,6 +854,34 @@ function renderFocusView() {
   if (valMaxVel) valMaxVel.textContent = `${p.toolhead.maxVel} mm/s`;
   if (valMaxAccel) valMaxAccel.textContent = `${p.toolhead.maxAccel.toLocaleString()} mm/s²`;
   if (valFanSpeed) valFanSpeed.textContent = `${p.toolhead.fan}%`;
+
+  // Chamber Temperature
+  const chamberTempVal = document.getElementById('chamberTempVal');
+  if (chamberTempVal) {
+    if (p.chamber && typeof p.chamber.actual === 'number' && p.chamber.actual > 0) {
+      chamberTempVal.textContent = p.chamber.actual.toFixed(1);
+    } else {
+      chamberTempVal.textContent = '--';
+    }
+  }
+
+  // Non-interactable Speeds & Fan Readings
+  const speedFactorVal = document.getElementById('speedFactorVal');
+  const speedFactorBar = document.getElementById('speedFactorBar');
+  const spd = (p.toolhead && typeof p.toolhead.speedFactor === 'number') ? p.toolhead.speedFactor : 100;
+  if (speedFactorVal) speedFactorVal.textContent = `${spd}%`;
+  if (speedFactorBar) {
+    const pct = Math.min(100, Math.max(0, ((spd - 50) / 150) * 100));
+    speedFactorBar.style.width = `${pct}%`;
+  }
+
+  const fanSpeedVal = document.getElementById('fanSpeedVal');
+  const fanSpeedBar = document.getElementById('fanSpeedBar');
+  const fan = (p.toolhead && typeof p.toolhead.fan === 'number') ? p.toolhead.fan : 0;
+  if (fanSpeedVal) fanSpeedVal.textContent = `${fan}%`;
+  if (fanSpeedBar) {
+    fanSpeedBar.style.width = `${Math.min(100, Math.max(0, fan))}%`;
+  }
 
   // Stream preview HUD
   const hudTimestamp = document.getElementById('hudTimestamp');
@@ -1167,40 +1196,6 @@ function initEventListeners() {
     }
   });
 
-  // Jog Steps
-  document.querySelectorAll('.step-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.step-btn').forEach(b => b.classList.remove('active'));
-      e.target.classList.add('active');
-      STATE.selectedStep = parseFloat(e.target.getAttribute('data-step'));
-      logTerminal(`Jog step set to ${STATE.selectedStep} mm`, 'info');
-    });
-  });
-
-  // Jog Motion Buttons
-  document.querySelectorAll('.jog-btn[data-axis]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = e.currentTarget;
-      const axis = target.getAttribute('data-axis');
-      const dir = parseInt(target.getAttribute('data-dir'), 10);
-      jogAxis(axis, dir * STATE.selectedStep);
-    });
-  });
-
-  document.getElementById('btnHomeAll')?.addEventListener('click', () => sendGcode('G28'));
-  document.getElementById('btnHomeXY')?.addEventListener('click', () => sendGcode('G28 X Y'));
-  document.getElementById('btnHomeZ')?.addEventListener('click', () => sendGcode('G28 Z'));
-  document.getElementById('btnMotorsOff')?.addEventListener('click', () => sendGcode('M84'));
-
-  document.getElementById('btnExtrude')?.addEventListener('click', () => {
-    sendGcode('M83\nG1 E10 F300');
-    logTerminal('Extruding 10mm filament...', 'echo');
-  });
-  document.getElementById('btnRetract')?.addEventListener('click', () => {
-    sendGcode('M83\nG1 E-10 F600');
-    logTerminal('Retracting 10mm filament...', 'echo');
-  });
-
   // Heating Presets
   document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -1208,20 +1203,6 @@ function initEventListeners() {
       const temp = parseFloat(e.target.getAttribute('data-temp'));
       setTemperature(type, temp);
     });
-  });
-
-  // Speeds Sliders
-  document.getElementById('speedFactorSlider')?.addEventListener('input', (e) => {
-    const val = e.target.value;
-    document.getElementById('speedFactorVal').textContent = `${val}%`;
-    sendGcode(`M220 S${val}`);
-  });
-
-  document.getElementById('fanSpeedSlider')?.addEventListener('input', (e) => {
-    const val = e.target.value;
-    document.getElementById('fanSpeedVal').textContent = `${val}%`;
-    const pwm = Math.round((val / 100) * 255);
-    sendGcode(`M106 S${pwm}`);
   });
 
   // Terminal Form

@@ -331,20 +331,19 @@ def query_moonraker(printer):
         telemetry["bed"]["target"] = round(float(bed.get("target", 0.0)), 1)
         telemetry["bed"]["power"] = round(float(bed.get("power", 0.0)), 2)
 
-    # Chamber temperature (Only queried for printers with chamber sensors; FLASHFORGE AD5X has no probe)
+    # Chamber temperature (Queried across known Klipper/Moonraker chamber sensors)
     ch_temp = None
-    if printer.get("id") != "p2":
-        if "heater_generic chamber" in status:
-            ch_temp = float(status["heater_generic chamber"].get("temperature", 0.0))
-        elif "temperature_sensor Chamber_Thermal_Protection_Sensor" in status:
-            ch_temp = float(status["temperature_sensor Chamber_Thermal_Protection_Sensor"].get("temperature", 0.0))
-        elif "chamber" in status:
-            ch_temp = float(status["chamber"].get("temperature", 0.0))
-        elif "temperature_sensor chamber" in status:
-            ch_temp = float(status["temperature_sensor chamber"].get("temperature", 0.0))
+    if "heater_generic chamber" in status:
+        ch_temp = float(status["heater_generic chamber"].get("temperature", 0.0))
+    elif "temperature_sensor Chamber_Thermal_Protection_Sensor" in status:
+        ch_temp = float(status["temperature_sensor Chamber_Thermal_Protection_Sensor"].get("temperature", 0.0))
+    elif "chamber" in status:
+        ch_temp = float(status["chamber"].get("temperature", 0.0))
+    elif "temperature_sensor chamber" in status:
+        ch_temp = float(status["temperature_sensor chamber"].get("temperature", 0.0))
 
-        if ch_temp is not None and ch_temp > 0:
-            telemetry["chamber"]["actual"] = round(ch_temp, 1)
+    if ch_temp is not None and ch_temp > 0:
+        telemetry["chamber"]["actual"] = round(ch_temp, 1)
 
     # Toolhead kinematics
     if "toolhead" in status:
