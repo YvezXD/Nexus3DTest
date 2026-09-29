@@ -430,15 +430,19 @@ def push_to_pantheon(payload):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
-            resp_body = resp.read().decode("utf-8")
+        with urllib.request.urlopen(req, timeout=8.0) as resp:
+            resp_body = resp.read().decode("utf-8", errors="ignore")
             if resp.status == 200:
                 return True, resp_body
-            return False, f"HTTP {resp.status}: {resp_body}"
+            return False, f"HTTP {resp.status}: {resp_body[:100]}"
     except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        return False, f"HTTPError {e.code}: {err_body}"
-    except Exception as e:
+        err_body = ""
+        try:
+            err_body = e.read(256).decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+        return False, f"HTTPError {e.code}: {err_body[:100]}"
+    except (urllib.error.URLError, TimeoutError, socket.timeout, Exception) as e:
         return False, str(e)
 
 # ─── Main Polling Loop ───
@@ -454,61 +458,66 @@ def run_bridge():
     last_snapshot_time = 0.0
 
     while True:
-        loop_start = time.time()
-        telemetry_list = []
-        snapshots_dict = {}
+        try:
+            loop_start = time.time()
+            telemetry_list = []
+            snapshots_dict = {}
 
-        capture_snapshot_now = (loop_start - last_snapshot_time) >= SNAPSHOT_INTERVAL
+            capture_snapshot_now = (loop_start - last_snapshot_time) >= SNAPSHOT_INTERVAL
 
-        for p in PRINTERS:
-            if not p.get("enabled", True):
-                continue
+            for p in PRINTERS:
+                if not p.get("enabled", True):
+                    continue
 
-            # 1. Harvest telemetry
-            tel = query_moonraker(p)
-            if tel:
-                telemetry_list.append(tel)
-            else:
-                telemetry_list.append({
-                    "id": p["id"],
-                    "name": p["name"],
-                    "ip": p["ip"],
-                    "online": False,
-                    "state": "offline"
-                })
+                # 1. Harvest telemetry
+                tel = query_moonraker(p)
+                if tel:
+                    telemetry_list.append(tel)
+                else:
+                    telemetry_list.append({
+                        "id": p["id"],
+                        "name": p["name"],
+                        "ip": p["ip"],
+                        "online": False,
+                        "state": "offline"
+                    })
 
-            # 2. Capture snapshot if due
-            if capture_snapshot_now:
-                jpeg_bytes = capture_webcam_snapshot(p)
-                if jpeg_bytes:
-                    b64_str = base64.b64encode(jpeg_bytes).decode("ascii")
-                    snapshots_dict[p["id"]] = b64_str
+                # 2. Capture snapshot if due
+                if capture_snapshot_now:
+                    jpeg_bytes = capture_webcam_snapshot(p)
+                    if jpeg_bytes:
+                        b64_str = base64.b64encode(jpeg_bytes).decode("ascii")
+                        snapshots_dict[p["id"]] = b64_str
 
-        if capture_snapshot_now and snapshots_dict:
-            last_snapshot_time = loop_start
+            if capture_snapshot_now and snapshots_dict:
+                last_snapshot_time = loop_start
 
-        # 3. Push to Pantheon
-        if telemetry_list:
-            payload = {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "printers": telemetry_list
-            }
-            if snapshots_dict:
-                payload["snapshots"] = snapshots_dict
+            # 3. Push to Pantheon
+            if telemetry_list:
+                payload = {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "printers": telemetry_list
+                }
+                if snapshots_dict:
+                    payload["snapshots"] = snapshots_dict
 
-            success, msg = push_to_pantheon(payload)
-            if success:
-                p1_info = telemetry_list[0]
-                status_str = f"state={p1_info.get('state')} progress={p1_info.get('progress')}%"
-                snap_str = f"+ snap({len(snapshots_dict)})" if snapshots_dict else ""
-                logger.info(f"Pushed telemetry to Pantheon: {status_str} {snap_str}")
-            else:
-                logger.warning(f"Failed to push telemetry to Pantheon: {msg}")
+                success, msg = push_to_pantheon(payload)
+                if success:
+                    p1_info = telemetry_list[0]
+                    status_str = f"state={p1_info.get('state')} progress={p1_info.get('progress')}%"
+                    snap_str = f"+ snap({len(snapshots_dict)})" if snapshots_dict else ""
+                    logger.info(f"Pushed telemetry to Pantheon: {status_str} {snap_str}")
+                else:
+                    logger.warning(f"Failed to push telemetry to Pantheon: {msg}")
+                    time.sleep(1.5)
 
-        # Sleep remaining time
-        elapsed = time.time() - loop_start
-        sleep_time = max(0.5, POLL_INTERVAL - elapsed)
-        time.sleep(sleep_time)
+            # Sleep remaining time
+            elapsed = time.time() - loop_start
+            sleep_time = max(0.5, POLL_INTERVAL - elapsed)
+            time.sleep(sleep_time)
+        except Exception as e:
+            logger.error(f"Unexpected error in bridge loop: {e}")
+            time.sleep(2.0)
 
 if __name__ == "__main__":
     # 1. CLI Commands for manual toggle
@@ -536,8 +545,12 @@ if __name__ == "__main__":
     if auto_start_on_boot:
         ensure_autostart(True)
 
-    try:
-        run_bridge()
-    except KeyboardInterrupt:
-        logger.info("Bridge daemon stopped by user.")
-        sys.exit(0)
+    while True:
+        try:
+            run_bridge()
+        except KeyboardInterrupt:
+            logger.info("Bridge daemon stopped by user.")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"Bridge daemon error: {e}. Resuming in 3 seconds...")
+            time.sleep(3.0)
