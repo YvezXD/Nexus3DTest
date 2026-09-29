@@ -3098,6 +3098,9 @@ body.light-theme .reading-meter-fill.fan-fill {
   .main-container {
     padding: 0 1.25rem;
     margin: 1.25rem auto 2.5rem auto;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .top-nav {
@@ -3139,13 +3142,21 @@ body.light-theme .reading-meter-fill.fan-fill {
   }
 
   .telemetry-gauges-row {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
+    width: 100%;
   }
 
   .workspace-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) !important;
     gap: 1.25rem;
+    width: 100% !important;
+  }
+
+  .column-left,
+  .column-right {
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
   .panel-header {
@@ -3153,54 +3164,63 @@ body.light-theme .reading-meter-fill.fan-fill {
     gap: 0.75rem;
   }
 
-  .step-selector {
-    gap: 0.35rem;
-  }
-
-  .step-btn {
-    min-width: 44px;
-    min-height: 42px;
-    font-size: 0.85rem;
-  }
-
   .preset-btn {
-    min-height: 40px;
-  }
-
-  .unit-btn,
-  .speed-btn {
-    min-height: 40px;
-  }
-
-  .jog-main-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
-  }
-
-  .jog-extrude-box {
-    grid-column: 1 / -1;
+    min-height: 44px;
   }
 }
 
-/* ──────────────────── MOBILE (max-width: 768px) ──────────────────── */
+/* ──────────────────── MOBILE SUITE (max-width: 768px) ──────────────────── */
 @media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
   .main-container {
     padding: 0 0.85rem;
     margin: 1rem auto 2rem auto;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
+  /* Compact Non-Overlapping Mobile Header */
   .top-nav {
-    padding: 0.6rem 0.85rem;
+    padding: 0.55rem 0.85rem;
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
 
   .nav-brand {
     justify-content: flex-start;
     width: auto;
+    gap: 0.55rem;
+  }
+
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-logo .logo-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .brand-title {
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .brand-sub {
+    display: none; /* Hide subtitle to preserve horizontal space */
   }
 
   .nav-controls {
@@ -3208,35 +3228,44 @@ body.light-theme .reading-meter-fill.fan-fill {
     width: auto;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.45rem;
   }
 
   .nav-controls .nav-btn {
-    min-height: 38px;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.8rem;
+    min-height: 44px; /* Apple HIG standard touch target */
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 700;
     flex: initial;
   }
 
   .nav-status-group {
     order: 3;
     width: 100%;
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     flex-wrap: nowrap;
     gap: 0.35rem;
-    padding: 0.35rem 0 0 0;
-    margin-top: 0.1rem;
+    padding: 0.3rem 0 0 0;
+    margin-top: 0.15rem;
     border-top: 1px solid var(--border-subtle);
   }
 
-  .status-badge {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.72rem;
+  .pantheon-badge {
+    display: none; /* Condensed out of mobile viewport */
+  }
+
+  .network-badge {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.74rem;
+    min-height: 32px;
   }
 
   .latency-counter {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.72rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.74rem;
+    min-height: 32px;
   }
 
   /* Fleet Tabs */
@@ -3244,28 +3273,48 @@ body.light-theme .reading-meter-fill.fan-fill {
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
+    width: 100%;
   }
 
   .tabs-list {
     width: 100%;
+    max-width: 100%;
     overflow-x: auto;
     flex-wrap: nowrap;
     padding-bottom: 0.35rem;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    box-sizing: border-box;
   }
 
   .printer-tab {
-    min-width: 250px;
+    min-width: 230px;
     flex-shrink: 0;
-    min-height: 52px;
-    padding: 0.65rem 0.95rem;
+    min-height: 48px;
+    padding: 0.6rem 0.9rem;
+  }
+
+  /* Dual Fleet View on Mobile */
+  .dual-fleet-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .fleet-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   /* Job Hero Card */
   .job-hero-card {
     padding: 1rem;
     border-left-width: 3px;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .job-hero-left {
@@ -3273,6 +3322,7 @@ body.light-theme .reading-meter-fill.fan-fill {
     align-items: center;
     text-align: center;
     gap: 0.85rem;
+    width: 100%;
   }
 
   .job-thumbnail-box {
@@ -3280,9 +3330,15 @@ body.light-theme .reading-meter-fill.fan-fill {
     height: 110px;
   }
 
+  .job-info-block {
+    width: 100%;
+    min-width: 0;
+  }
+
   .job-title-row {
     justify-content: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
   }
 
   .job-filename {
@@ -3295,18 +3351,19 @@ body.light-theme .reading-meter-fill.fan-fill {
 
   .job-metrics-row {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
     width: 100%;
   }
 
   .metric-mini-card {
-    padding: 0.45rem;
+    padding: 0.5rem;
     text-align: center;
+    min-width: 0;
   }
 
   .metric-label {
-    font-size: 0.62rem;
+    font-size: 0.65rem;
   }
 
   .metric-val {
@@ -3321,14 +3378,16 @@ body.light-theme .reading-meter-fill.fan-fill {
 
   .job-actions-col .job-control-btn {
     flex: 1;
-    min-height: 48px;
+    min-height: 48px; /* Apple HIG touch standard */
     font-size: 0.92rem;
   }
 
-  /* Telemetry Gauges (Responsive 2-Column Grid on Mobile) */
+  /* Telemetry Gauges (Responsive 2-Column on Tablet/Landscape Phone) */
   .telemetry-gauges-row {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .chamber-card {
@@ -3336,22 +3395,25 @@ body.light-theme .reading-meter-fill.fan-fill {
   }
 
   .gauge-card {
-    padding: 0.85rem 0.55rem;
+    padding: 0.9rem 0.65rem;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .gauge-circle-wrap {
-    width: 110px;
-    height: 110px;
+    width: 115px;
+    height: 115px;
   }
 
   .preset-buttons {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.4rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
+    width: 100%;
   }
 
   .preset-btn {
-    min-height: 44px;
+    min-height: 44px; /* Apple HIG standard */
     font-size: 0.78rem;
     padding: 0.35rem 0.2rem;
     display: flex;
@@ -3359,129 +3421,124 @@ body.light-theme .reading-meter-fill.fan-fill {
     justify-content: center;
   }
 
-  .slider-control::-webkit-slider-thumb {
-    width: 24px;
-    height: 24px;
+  /* Workspace Grid - Fluid Stack on Mobile */
+  .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1.25rem;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
   }
 
-  /* Camera Panel */
+  .column-left,
+  .column-right {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .panel-card {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
   .panel-header {
-    padding: 0.75rem 0.9rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .panel-tabs {
-    flex-wrap: wrap;
+    display: flex;
     gap: 0.35rem;
+    width: 100%;
   }
 
   .panel-tab-btn {
-    min-height: 40px;
+    flex: 1;
+    min-height: 44px; /* Apple HIG standard */
     padding: 0.4rem 0.65rem;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
+    justify-content: center;
   }
 
   .panel-actions {
-    flex-wrap: wrap;
-    gap: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 0.4rem;
   }
 
   .panel-icon-btn {
-    min-height: 38px;
-    min-width: 38px;
+    min-height: 44px;
+    min-width: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
 
-  /* Motion Jog Panel */
-  .jog-controls-body {
-    padding: 1rem;
-  }
-
-  .step-selector {
-    width: 100%;
-    display: flex;
-    gap: 0.35rem;
-  }
-
-  .step-label {
-    display: none;
-  }
-
-  .step-btn {
-    flex: 1;
-    min-height: 44px;
-    min-width: 44px;
-    font-size: 0.85rem;
-    font-weight: 700;
-  }
-
-  .jog-main-grid {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.25rem;
-  }
-
-  .xy-jog-box .jog-btn {
-    width: 56px;
-    height: 56px;
-    font-size: 0.82rem;
-  }
-
-  .z-jog-box .jog-btn {
-    width: 56px;
-    height: 56px;
-    font-size: 0.82rem;
-  }
-
-  .jog-extrude-box {
-    width: 100%;
-  }
-
-  .extrude-actions {
-    display: flex;
-    width: 100%;
-    gap: 0.5rem;
-  }
-
-  .ext-btn {
-    flex: 1;
-    min-height: 46px;
-    font-size: 0.85rem;
-  }
-
-  .motors-off-btn {
-    width: 100%;
-    min-height: 44px;
-    font-size: 0.82rem;
+  #tempCanvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 180px;
+    display: block;
   }
 
   /* Terminal */
   .terminal-body {
-    height: 250px;
+    height: 260px !important;
     font-size: 0.74rem;
   }
 
-  .terminal-input-row {
+  .terminal-macros {
+    display: flex;
+    gap: 0.4rem;
     padding: 0.5rem 0.75rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .macro-btn {
+    min-height: 44px; /* Apple HIG standard */
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .terminal-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .term-input {
     min-height: 44px;
-    font-size: 16px !important; /* Prevents auto-zoom on iOS */
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+    flex: 1;
+    min-width: 0;
   }
 
   .term-send-btn {
     min-height: 44px;
-    padding: 0 1.2rem;
-    font-size: 0.9rem;
-  }
-
-  .macro-btn {
-    min-height: 38px;
-    padding: 0.4rem 0.75rem;
-    font-size: 0.78rem;
+    padding: 0 1.25rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    flex-shrink: 0;
   }
 
   /* Modals */
@@ -3503,23 +3560,77 @@ body.light-theme .reading-meter-fill.fan-fill {
   }
 }
 
-/* ──────────────────── SMALL MOBILE (max-width: 480px) ──────────────────── */
-@media (max-width: 480px) {
+/* ──────────────────── IPHONE 16 / NARROW MOBILE (max-width: 430px) ──────────────────── */
+@media (max-width: 430px) {
+  .top-nav {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .nav-controls {
+    gap: 0.35rem;
+  }
+
+  .nav-controls .nav-btn {
+    padding: 0.4rem 0.55rem;
+    font-size: 0.76rem;
+    min-height: 44px;
+  }
+
+  .brand-title {
+    font-size: 1.05rem;
+  }
+
+  /* Full Fluid 1-Column Stack for Gauges on iPhone 16 */
   .telemetry-gauges-row {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .chamber-card {
+    grid-column: auto !important;
   }
 
   .gauge-card {
-    padding: 0.75rem 0.4rem;
+    padding: 1.25rem 1rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .gauge-circle-wrap {
-    width: 95px;
-    height: 95px;
+    width: 130px;
+    height: 130px;
   }
 
   .gauge-actual {
+    font-size: 1.45rem;
+  }
+
+  .preset-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+    width: 100%;
+  }
+
+  .preset-btn {
+    min-height: 44px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .kinematics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .coord-box {
+    padding: 0.7rem 0.4rem;
+  }
+
+  .coord-val {
     font-size: 1.15rem;
   }
 
@@ -3527,32 +3638,9 @@ body.light-theme .reading-meter-fill.fan-fill {
     grid-template-columns: 1fr;
   }
 
-  .preset-buttons {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* ──────────────────── EXTRA SMALL MOBILE (max-width: 420px) ──────────────────── */
-@media (max-width: 420px) {
-  .nav-controls {
-    gap: 0.35rem;
-  }
-
-  .nav-controls .nav-btn {
-    padding: 0.35rem 0.6rem;
-    font-size: 0.76rem;
-  }
-
-  .brand-title {
-    font-size: 1.1rem;
-  }
-
-  .brand-sub {
-    display: none;
-  }
-
   .job-metrics-row {
     grid-template-columns: 1fr;
   }
 }
+
 

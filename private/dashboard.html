@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS 3D — Fleet Telemetry & Monitor</title>
+  <meta name="description" content="Next-generation 3D printer fleet monitoring and telemetry system for Klipper, Moonraker, and OctoPrint. Ready for Pantheon WebOps hosting.">
+  
+  <!-- Modern Typography from Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css?v=3.0">
+</head>
+<body class="light-theme">
+
+  <!-- Top Navigation & Global Telemetry Bar -->
+  <header class="top-nav" id="topNav">
+    <div class="nav-brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" class="logo-icon" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-title">NEXUS <span class="gradient-text">3D</span></h1>
+        <span class="brand-sub">Fleet Telemetry & Command</span>
+      </div>
+    </div>
+
+    <!-- Live System Badges -->
+    <div class="nav-status-group">
+      <div class="status-badge pantheon-badge" id="pantheonBadge" title="Configured for Pantheon WebOps Hosting">
+        <span class="badge-dot pulse-purple"></span>
+        <span class="badge-label">Pantheon WebOps</span>
+      </div>
+      <div class="status-badge network-badge" id="networkBadge" title="Bridge Daemon Connection Status">
+        <span class="badge-dot pulse-cyan" id="networkPulse"></span>
+        <span class="badge-label" id="networkLabel">Bridge: Connecting...</span>
+      </div>
+      <div class="latency-counter" id="latencyDisplay" title="Average Network Latency">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        <span id="latencyValue">18 ms</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions & Config -->
+    <div class="nav-controls">
+      <button class="nav-btn config-btn" id="openConfigBtn" title="Configure Printer IPs, Theme, and Preferences">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+
+      <button class="nav-btn estop-btn" id="globalEstopBtn" title="Emergency Stop All Printers">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>E-STOP ALL</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Bridge Status Banner (shown when bridge is stale or offline) -->
+  <div class="network-banner" id="bridgeBanner" style="display: none;">
+    <div class="banner-content">
+      <div class="banner-icon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="banner-text" id="bridgeBannerText">
+        <strong>Bridge Offline:</strong> No telemetry received from the local bridge daemon. Ensure the bridge is running on your LAN desktop.
+      </div>
+      <div class="banner-actions">
+        <button class="banner-btn banner-sim-btn" id="bannerSimBtn">Enable Demo Simulation</button>
+        <button class="banner-close" id="bannerCloseBtn">&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="main-container">
+    
+    <!-- Fleet Tabs & View Mode Switcher -->
+    <section class="fleet-tabs-bar" aria-labelledby="fleetSelectionHeading">
+      <h2 id="fleetSelectionHeading" class="sr-only">Fleet Printers Selection</h2>
+      <div class="tabs-list" role="tablist" aria-label="Printer Selection Tabs">
+        <!-- Tab: QIDI Q2 (Primary) -->
+        <button class="printer-tab active" id="tabPrinter1" data-printer="p1" role="tab" aria-selected="true">
+          <div class="tab-indicator status-printing" id="p1TabDot"></div>
+          <div class="tab-info">
+            <div class="tab-title-row">
+              <span class="tab-name" id="p1TabName">QIDI Q2 (192.168.1.124)</span>
+              <span class="tab-state-pill pill-standby" id="p1StatePill">SYNCING</span>
+            </div>
+            <div class="tab-meta-row">
+              <span class="tab-ip">192.168.1.124</span>
+              <span class="tab-stat-preview" id="p1StatPreview">Connecting...</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- Tab: FLASHFORGE AD5X (Printer 2) -->
+        <button class="printer-tab" id="tabPrinter2" data-printer="p2" role="tab" aria-selected="false">
+          <div class="tab-indicator status-standby" id="p2TabDot"></div>
+          <div class="tab-info">
+            <div class="tab-title-row">
+              <span class="tab-name" id="p2TabName">FLASHFORGE AD5X</span>
+              <span class="tab-state-pill pill-standby" id="p2StatePill">STANDBY</span>
+            </div>
+            <div class="tab-meta-row">
+              <span class="tab-ip">192.168.1.36</span>
+              <span class="tab-stat-preview" id="p2StatPreview">Standby • 192.168.1.36:7125</span>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <!-- View Mode Controls -->
+      <div class="view-mode-controls">
+        <button class="refresh-btn" id="globalRefreshBtn" title="Manual Telemetry Poll">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================== DUAL FLEET OVERVIEW CONTAINER ==================== -->
+    <section class="dual-fleet-container" id="dualFleetContainer" style="display: none;" aria-labelledby="fleetOverviewHeading">
+      <h2 id="fleetOverviewHeading" class="sr-only">Fleet Overview</h2>
+      <!-- Fleet Card 1 -->
+      <div class="fleet-card card-glass" id="fleetCard1">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="status-indicator-dot online"></span>
+            <div>
+              <h3 class="card-title">QIDI Q2 (192.168.1.124)</h3>
+              <span class="card-sub">IP: 192.168.1.124 | Moonraker v1.4</span>
+            </div>
+          </div>
+          <span class="badge-status-glow active">PRINTING</span>
+        </div>
+        
+        <div class="fleet-card-body">
+          <div class="fleet-thumb-wrap">
+            <img src="assets/NewPrinterIcon.jpeg" alt="Print Preview" class="fleet-thumb-img">
+            <div class="thumb-overlay-progress">
+              <span id="fc1Percent">0.0%</span>
+            </div>
+          </div>
+          <div class="fleet-summary-meta">
+            <div class="meta-row">
+              <span class="meta-label">File</span>
+              <span class="meta-value gcode-name" id="fc1File">None (Standby)</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Chamber</span>
+              <span class="meta-value highlight-purple" id="fc1Chamber">--°C</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Extruder</span>
+              <span class="meta-value highlight-cyan" id="fc1Extruder">--°C / --°C</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Bed</span>
+              <span class="meta-value highlight-amber" id="fc1Bed">--°C / --°C</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Remaining</span>
+              <span class="meta-value highlight-emerald" id="fc1Remain">--:--:--</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fleet-card-footer">
+          <button class="btn-sm btn-outline select-printer-btn" data-target="p1">Open Details & Controls</button>
+          <button class="btn-sm btn-danger pause-btn-p1">Pause</button>
+        </div>
+      </div>
+
+      <!-- Fleet Card 2: FLASHFORGE AD5X -->
+      <div class="fleet-card card-glass" id="fleetCard2">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="status-indicator-dot online" id="fc2Dot"></span>
+            <div>
+              <h3 class="card-title">FLASHFORGE AD5X</h3>
+              <span class="card-sub">IP: 192.168.1.36 | Klipper / Moonraker</span>
+            </div>
+          </div>
+          <span class="badge-status-glow standby" id="fc2Badge">OFFLINE / STANDBY</span>
+        </div>
+        
+        <div class="fleet-card-body">
+          <div class="fleet-thumb-wrap">
+            <img src="assets/KK3.webp" alt="FLASHFORGE AD5X Preview" class="fleet-thumb-img" id="fc2Img">
+            <div class="thumb-overlay-idle" id="fc2Overlay">
+              <span id="fc2StateText">Ready (Idle)</span>
+            </div>
+          </div>
+          <div class="fleet-summary-meta">
+            <div class="meta-row">
+              <span class="meta-label">Status</span>
+              <span class="meta-value gcode-name" id="fc2Diag">Klipper Connected</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Extruder</span>
+              <span class="meta-value highlight-cyan" id="fc2Extruder">--°C / --°C</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Bed</span>
+              <span class="meta-value highlight-amber" id="fc2Bed">--°C / --°C</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fleet-card-footer">
+          <button class="btn-sm btn-outline select-printer-btn" data-target="p2">Open Details & Controls</button>
+          <button class="btn-sm btn-danger pause-btn-p2">Pause</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== DETAILED FOCUS CONTAINER ==================== -->
+    <div class="focus-dashboard-container" id="focusContainer" aria-labelledby="activePrinterHeading">
+      <h2 id="activePrinterHeading" class="sr-only">Active Printer Dashboard</h2>
+
+      <!-- HERO PRINT JOB CARD -->
+      <section class="job-hero-card card-glass" id="jobHeroCard" aria-labelledby="heroFilename">
+        <div class="job-hero-left">
+          <div class="job-thumbnail-box">
+            <img src="assets/NewPrinterIcon.jpeg" alt="Active Print Job Thumbnail" class="job-thumb" id="heroThumb">
+            <div class="thumb-live-tag">
+              <span class="live-dot pulse"></span>
+              <span id="heroLiveTag">LIVE</span>
+            </div>
+          </div>
+
+          <div class="job-info-block">
+            <div class="job-title-row">
+              <h3 class="job-filename" id="heroFilename" title="Awaiting Print Job">None (Standby)</h3>
+              <span class="badge-state-hero state-standby" id="heroStateBadge">STANDBY</span>
+            </div>
+            
+            <div class="job-progress-wrapper">
+              <div class="progress-labels">
+                <span class="progress-title" style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em;">Completion</span>
+                <span class="progress-percent-text" id="heroPercent">0.0%</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="heroProgressBar" style="width: 0%;">
+                  <div class="progress-glow-head"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Metric Cards Mini-Row -->
+            <div class="job-metrics-row">
+              <div class="metric-mini-card">
+                <span class="metric-label">TIME ELAPSED</span>
+                <span class="metric-val mono" id="heroElapsed">00:00:00</span>
+              </div>
+              <div class="metric-mini-card">
+                <span class="metric-label">TIME REMAINING</span>
+                <span class="metric-val mono highlight-emerald" id="heroRemaining">--:--:--</span>
+              </div>
+              <div class="metric-mini-card">
+                <span class="metric-label">FILAMENT USED</span>
+                <span class="metric-val mono highlight-cyan" id="heroFilament">0.00 m</span>
+              </div>
+              <div class="metric-mini-card">
+                <span class="metric-label">TOTAL TIME EST.</span>
+                <span class="metric-val mono" id="heroTotalTime">--:--:--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Job Control Buttons -->
+        <div class="job-actions-col">
+          <button class="job-control-btn btn-pause" id="btnJobPause" title="Pause Active Print">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+            <span>PAUSE</span>
+          </button>
+          
+          <button class="job-control-btn btn-resume" id="btnJobResume" style="display: none;" title="Resume Print">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <span>RESUME</span>
+          </button>
+
+          <button class="job-control-btn btn-cancel" id="btnJobCancel" title="Cancel Print Job">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            <span>CANCEL</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- TELEMETRY GAUGES ROW -->
+      <section class="telemetry-gauges-row" aria-labelledby="telemetryGaugesHeading">
+        <h3 id="telemetryGaugesHeading" class="sr-only">Thermal and Motion Telemetry</h3>
+        <!-- Extruder (Nozzle) Gauge Card -->
+        <div class="gauge-card card-glass" id="extruderGaugeCard">
+          <div class="gauge-header">
+            <div class="gauge-title-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="gauge-icon icon-cyan">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
+              </svg>
+              <span>EXTRUDER (NOZZLE)</span>
+            </div>
+            <span class="power-tag" id="extPowerTag">PWR: 42%</span>
+          </div>
+
+          <div class="gauge-body">
+            <div class="gauge-circle-wrap">
+              <svg viewBox="0 0 140 140" class="gauge-svg">
+                <circle class="gauge-bg" cx="70" cy="70" r="58"></circle>
+                <circle class="gauge-fill gauge-cyan" id="extGaugeCircle" cx="70" cy="70" r="58" style="stroke-dashoffset: 80;"></circle>
+              </svg>
+              <div class="gauge-center-readout">
+                <div class="readout-main">
+                  <span class="readout-actual mono" id="extTempActual">259.8</span>
+                  <span class="readout-unit">°C</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Target temperature badge neatly placed below circle to prevent any clipping -->
+            <div class="gauge-target-badge">
+              <span class="target-badge-label">TARGET</span>
+              <span class="target-badge-val mono"><span id="extTempTarget">260.0</span>°C</span>
+            </div>
+            
+            <!-- Quick Heating Presets -->
+            <div class="preset-buttons">
+              <button class="preset-btn" data-type="ext" data-temp="0">Off</button>
+              <button class="preset-btn" data-type="ext" data-temp="200">PLA (200)</button>
+              <button class="preset-btn" data-type="ext" data-temp="240">PETG (240)</button>
+              <button class="preset-btn" data-type="ext" data-temp="260">ABS (260)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heated Bed Gauge Card -->
+        <div class="gauge-card card-glass" id="bedGaugeCard">
+          <div class="gauge-header">
+            <div class="gauge-title-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="gauge-icon icon-amber">
+                <rect x="2" y="14" width="20" height="7" rx="1"></rect>
+                <path d="M6 10c0-2 1-3 3-3s3 1 3 3"></path>
+                <path d="M12 10c0-2 1-3 3-3s3 1 3 3"></path>
+              </svg>
+              <span>HEATED BED</span>
+            </div>
+            <span class="power-tag" id="bedPowerTag">PWR: 34%</span>
+          </div>
+
+          <div class="gauge-body">
+            <div class="gauge-circle-wrap">
+              <svg viewBox="0 0 140 140" class="gauge-svg">
+                <circle class="gauge-bg" cx="70" cy="70" r="58"></circle>
+                <circle class="gauge-fill gauge-amber" id="bedGaugeCircle" cx="70" cy="70" r="58" style="stroke-dashoffset: 140;"></circle>
+              </svg>
+              <div class="gauge-center-readout">
+                <div class="readout-main">
+                  <span class="readout-actual mono" id="bedTempActual">100.0</span>
+                  <span class="readout-unit">°C</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Target temperature badge neatly placed below circle -->
+            <div class="gauge-target-badge">
+              <span class="target-badge-label">TARGET</span>
+              <span class="target-badge-val mono"><span id="bedTempTarget">100.0</span>°C</span>
+            </div>
+
+            <!-- Quick Bed Presets -->
+            <div class="preset-buttons">
+              <button class="preset-btn" data-type="bed" data-temp="0">Off</button>
+              <button class="preset-btn" data-type="bed" data-temp="60">PLA (60)</button>
+              <button class="preset-btn" data-type="bed" data-temp="80">PETG (80)</button>
+              <button class="preset-btn" data-type="bed" data-temp="100">ABS (100)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kinematics & Toolhead Card -->
+        <div class="gauge-card card-glass" id="kinematicsCard">
+          <div class="gauge-header">
+            <div class="gauge-title-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="gauge-icon icon-emerald">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="22" y1="12" x2="18" y2="12"></line>
+                <line x1="6" y1="12" x2="2" y2="12"></line>
+                <line x1="12" y1="6" x2="12" y2="2"></line>
+                <line x1="12" y1="22" x2="12" y2="18"></line>
+              </svg>
+              <span>TOOLHEAD & MOTION</span>
+            </div>
+            <span class="power-tag highlight-emerald" id="kinematicsTag">CoreXY Active</span>
+          </div>
+
+          <div class="kinematics-grid">
+            <div class="coord-box">
+              <span class="coord-axis">X</span>
+              <span class="coord-val mono" id="coordX">113.3</span>
+              <span class="coord-unit">mm</span>
+            </div>
+            <div class="coord-box">
+              <span class="coord-axis">Y</span>
+              <span class="coord-val mono" id="coordY">112.5</span>
+              <span class="coord-unit">mm</span>
+            </div>
+            <div class="coord-box">
+              <span class="coord-axis">Z</span>
+              <span class="coord-val mono" id="coordZ">2.01</span>
+              <span class="coord-unit">mm</span>
+            </div>
+          </div>
+
+          <div class="kinematics-speeds">
+            <div class="speed-row">
+              <span class="speed-label">Velocity Max:</span>
+              <span class="speed-val mono" id="valMaxVel">600 mm/s</span>
+            </div>
+            <div class="speed-row">
+              <span class="speed-label">Max Accel:</span>
+              <span class="speed-val mono" id="valMaxAccel">10,000 mm/s²</span>
+            </div>
+            <div class="speed-row">
+              <span class="speed-label">Part Fan:</span>
+              <span class="speed-val mono highlight-cyan" id="valFanSpeed">100%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chamber & Speed/Cooling Readout Card -->
+        <div class="gauge-card card-glass chamber-card" id="chamberCard">
+          <div class="gauge-header">
+            <div class="gauge-title-box">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" class="gauge-icon icon-purple">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+              <span>CHAMBER & SPEEDS</span>
+            </div>
+            <span class="power-tag highlight-purple" id="chamberTag">Enclosed</span>
+          </div>
+
+          <div class="chamber-body">
+            <!-- Chamber Temperature Readout -->
+            <div class="chamber-readout-item">
+              <span class="chamber-sub">Chamber Temp</span>
+              <div class="chamber-temp-val mono">
+                <span id="chamberTempVal">--</span><span class="sub-deg">°C</span>
+              </div>
+            </div>
+
+            <!-- Non-interactable Speed Factor Readout -->
+            <div class="reading-group">
+              <div class="reading-header">
+                <span class="reading-label">Speed Factor</span>
+                <span class="reading-val mono" id="speedFactorVal">100%</span>
+              </div>
+              <div class="reading-meter-track" role="meter" aria-valuenow="100" aria-valuemin="50" aria-valuemax="200" aria-label="Speed Factor">
+                <div class="reading-meter-fill speed-fill" id="speedFactorBar" style="width: 50%;"></div>
+              </div>
+            </div>
+
+            <!-- Non-interactable Part Fan Speed Readout -->
+            <div class="reading-group">
+              <div class="reading-header">
+                <span class="reading-label">Part Fan Speed</span>
+                <span class="reading-val mono" id="fanSpeedVal">100%</span>
+              </div>
+              <div class="reading-meter-track" role="meter" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Part Fan Speed">
+                <div class="reading-meter-fill fan-fill" id="fanSpeedBar" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TWO COLUMN MAIN WORKSPACE (WEBCAM + TEMPERATURE CHART + CONTROLS) -->
+      <section class="workspace-grid" aria-labelledby="workspaceControlsHeading">
+        <h3 id="workspaceControlsHeading" class="sr-only">Camera Feed, Axis Motion, and G-Code Terminal</h3>
+        
+        <!-- LEFT COLUMN: Live Camera / Toolhead Bed View -->
+        <div class="column-left">
+          <div class="panel-card card-glass" id="cameraPanel">
+            <div class="panel-header">
+              <div class="panel-tabs">
+                <button class="panel-tab-btn active" id="tabStreamLive">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 7l-7 5 7 5V7z"></path>
+                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                  </svg>
+                  <span>Live Camera</span>
+                </button>
+                <button class="panel-tab-btn" id="tabBedVisualizer">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                  </svg>
+                  <span>2D Bed Visualizer</span>
+                </button>
+              </div>
+
+              <div class="panel-actions">
+                <span class="fps-badge" id="cameraFpsBadge">15 FPS</span>
+                
+                <button class="panel-icon-btn btn-popout" id="btnPopoutCam" title="Open Stream in Popout Window (Bypasses HTTPS Block)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  <span>Popout</span>
+                </button>
+
+                <button class="panel-icon-btn" id="btnToggleSnapMode" title="Toggle Auto-Snapshot Polling">
+                  <span id="snapModeLabel">Snapshot</span>
+                </button>
+
+                <button class="panel-icon-btn" id="btnSnapCam" title="Take Instant Camera Snapshot">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                    <circle cx="12" cy="13" r="4"></circle>
+                  </svg>
+                </button>
+                <button class="panel-icon-btn" id="btnFullCam" title="Toggle Fullscreen Camera">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="panel-body camera-view-body">
+              <!-- Camera Stream Container -->
+              <div class="stream-wrapper" id="streamWrapper">
+                <img id="cameraStreamImg" src="assets/NewPrinterIcon.jpeg" alt="3D Printer Camera Stream" class="live-stream-feed">
+                
+                <!-- Camera Standby / Offline Overlay -->
+                <div class="camera-standby-overlay" id="cameraStandbyOverlay" style="display: none;">
+                  <div class="standby-card card-glass">
+                    <div class="standby-icon-box">
+                      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 7l-7 5 7 5V7z"></path>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                      </svg>
+                    </div>
+                    <h4 class="standby-title">Awaiting Camera Snapshot</h4>
+                    <p class="standby-desc">
+                      The local desktop bridge daemon pushes live snapshots over HTTPS. Feed will appear when received.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="camera-hud-overlay">
+                  <div class="hud-top-left">
+                    <span class="hud-rec-dot"></span>
+                    <span class="hud-cam-name" id="hudCamName">CAM 1: QIDI HD (192.168.1.124)</span>
+                  </div>
+                  <div class="hud-bottom-right">
+                    <span id="hudTimestamp">2026-09-28 15:00:00</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2D Bed Visualizer Canvas (Hidden by default) -->
+              <div class="bed-visualizer-wrapper" id="bedVisualizerWrapper" style="display: none;">
+                <canvas id="bedCanvas" width="400" height="350"></canvas>
+                <div class="bed-legend">
+                  <span><span class="leg-color leg-bed"></span> Bed (275 x 295 mm)</span>
+                  <span><span class="leg-color leg-part"></span> Active Part</span>
+                  <span><span class="leg-color leg-nozzle"></span> Toolhead Nozzle</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: G-Code Terminal -->
+        <div class="column-right">
+
+          <!-- G-Code Interactive Terminal -->
+          <div class="panel-card card-glass" id="terminalPanel">
+            <div class="panel-header">
+              <div class="panel-title-group">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="icon-purple">
+                  <polyline points="4 17 10 11 4 5"></polyline>
+                  <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+                <h3>G-Code Command Terminal</h3>
+              </div>
+              <button class="clear-term-btn" id="btnClearTerminal" title="Clear Terminal Log">Clear</button>
+            </div>
+
+            <!-- Terminal Output Log -->
+            <div class="terminal-body" id="terminalOutput">
+              <div class="term-line info"><span class="term-time">[15:00:00]</span> Connected to Moonraker API at 192.168.1.124:7125.</div>
+              <div class="term-line success"><span class="term-time">[15:00:01]</span> Klippy State: READY. Printer hostname: linaro-alip.</div>
+              <div class="term-line info"><span class="term-time">[15:00:01]</span> Active file: qidi-box-ams-snap-base-for-v5.gcode.3mf.</div>
+              <div class="term-line info"><span class="term-time">[15:00:02]</span> Print progress: 5.8%. Extruder 259.8°C, Bed 100.1°C.</div>
+            </div>
+
+            <!-- Terminal Quick Macros -->
+            <div class="terminal-macros">
+              <button class="macro-btn" data-cmd="M105">M105 (Temps)</button>
+              <button class="macro-btn" data-cmd="M114">M114 (Get Pos)</button>
+              <button class="macro-btn" data-cmd="G28">G28 (Home)</button>
+              <button class="macro-btn" data-cmd="M106 S255">Fan 100%</button>
+              <button class="macro-btn" data-cmd="M107">Fan Off</button>
+            </div>
+
+            <!-- Command Input Box -->
+            <form class="terminal-input-row" id="terminalForm">
+              <span class="term-prompt">&gt;</span>
+              <input type="text" class="term-input" id="terminalInput" name="terminalInput" placeholder="Send G-code command (e.g. G28, M105, STATUS)..." autocomplete="off" aria-label="G-code Terminal Command Input">
+              <button type="submit" class="term-send-btn">Send</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- End Focus Container -->
+  </main>
+
+  <!-- ==================== PANTHEON HOSTING & NETWORK GUIDE MODAL ==================== -->
+  <div class="modal-backdrop" id="guideModal" style="display: none;">
+    <div class="modal-window card-glass guide-modal-window">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <div class="badge-dot pulse-purple"></div>
+          <h2>Pantheon Hosting & Network Architecture Guide</h2>
+        </div>
+        <button class="modal-close-btn" id="closeGuideModal">&times;</button>
+      </div>
+
+      <div class="modal-body guide-body">
+        <p class="guide-intro">
+          This 3D printer monitoring system is configured for seamless deployment to <strong>Pantheon WebOps Hosting</strong> while communicating with your local network printers (<code>192.168.1.124</code> and <code>192.168.1.36</code>).
+        </p>
+
+        <!-- Step 1: Deploy to Pantheon -->
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Deploying to Pantheon</h3>
+            <p>Your repository already includes <code>pantheon.yml</code> and <code>index.php</code>. To push this to your Pantheon site:</p>
+            <pre class="code-block"><code># 1. Initialize git if needed
+git init
+git add .
+git commit -m "Deploy 3D Printer Monitor to Pantheon"
+
+# 2. Add your Pantheon Git remote (found in your Pantheon Dashboard)
+git remote add pantheon ssh://codeserver.dev.{site-uuid}@codeserver.dev.{site-uuid}.drush.in:2222/~/repository.git
+
+# 3. Push to Pantheon Dev environment
+git push pantheon master</code></pre>
+          </div>
+        </div>
+
+        <!-- Step 2: How Client-Side Local Network Routing Works -->
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Understanding Local IP Access from Cloud Sites</h3>
+            <p>
+              When this web app is opened on your computer in your web browser, <strong>your browser is on the same local Wi-Fi / Ethernet network</strong> as your printers (<code>192.168.1.124</code> and <code>192.168.1.36</code>).
+            </p>
+            <p>
+              The browser sends HTTP/WebSocket requests directly from your machine to the printer IPs on port <code>7125</code> or <code>80</code>.
+            </p>
+          </div>
+        </div>
+
+        <!-- Step 3: Moonraker CORS Configuration -->
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Configuring Moonraker CORS (One-Time Setup)</h3>
+            <p>To allow your Pantheon site to control your Klipper/Moonraker printer without browser CORS rejection, add your Pantheon URL or a wildcard to <code>moonraker.conf</code>:</p>
+            <pre class="code-block"><code>[authorization]
+cors_domains:
+    *://*.pantheonsite.io
+    https://*.pantheonsite.io
+    http://*.pantheonsite.io
+    http://localhost:*
+    http://127.0.0.1:*</code></pre>
+            <p class="guide-tip">Then restart Moonraker (<code>sudo systemctl restart moonraker</code> or restart through Mainsail/Fluidd).</p>
+          </div>
+        </div>
+
+        <!-- Step 4: Remote Internet Access (Cloudflare Tunnel / Tailscale) -->
+        <div class="guide-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Monitoring from Outside Home (Remote Access)</h3>
+            <p>If you want to view your printers on Pantheon when you are away from home, you can enter a public Tunnel URL (Cloudflare Tunnel, Tailscale Funnel, or Ngrok) in the <strong>Settings</strong> modal. The app will automatically connect to your tunnel!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="guideUnderstoodBtn">Got It, Let's Monitor!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PRINTER SETTINGS MODAL ==================== -->
+  <div class="modal-backdrop" id="configModal" style="display: none;">
+    <div class="modal-window card-glass config-modal-window">
+      <div class="modal-header">
+        <h2>Settings & Fleet Configuration</h2>
+        <button class="modal-close-btn" id="closeConfigModal">&times;</button>
+      </div>
+
+      <div class="modal-body config-body">
+        <!-- Interface & Session Preferences -->
+        <div class="config-section pref-section">
+          <h3 class="config-section-title highlight-cyan">Preferences & Session Controls</h3>
+          <div class="pref-grid">
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Visual Theme</span>
+                <span class="pref-hint">Switch between Light and Dark mode</span>
+              </div>
+              <button type="button" class="nav-btn guide-btn" id="themeToggleBtn" title="Toggle Light / Dark Mode">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <span id="themeBtnLabel">Dark Mode</span>
+              </button>
+            </div>
+
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Demo Simulation</span>
+                <span class="pref-hint">Simulate telemetry if 3D printers are offline</span>
+              </div>
+              <div class="sim-toggle-wrapper" title="Toggle simulation telemetry mode">
+                <span class="toggle-label">Demo Sim</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="simModeToggle" name="simModeToggle" aria-label="Toggle Simulation Mode">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="pref-item">
+              <div class="pref-meta">
+                <span class="pref-title">Active Session</span>
+                <span class="pref-hint">Sign out of active fleet monitoring dashboard</span>
+              </div>
+              <a class="nav-btn btn-outline" href="index.php?route=logout" title="Sign Out" style="text-decoration:none;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Logout</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Printer 1 Settings -->
+        <div class="config-section">
+          <h3 class="config-section-title highlight-cyan">Printer 01 Settings</h3>
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP1Name">Printer Name</label>
+              <input type="text" id="cfgP1Name" name="cfgP1Name" value="Printer 01 (QIDI X-Series)">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP1Ip">Local IP Address</label>
+              <input type="text" id="cfgP1Ip" name="cfgP1Ip" value="192.168.1.124">
+            </div>
+            <div class="form-group flex-1">
+              <label for="cfgP1Port">API Port</label>
+              <input type="number" id="cfgP1Port" name="cfgP1Port" value="7125">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-3">
+              <label for="cfgP1Remote">Remote Tunnel URL (Optional Cloud Access)</label>
+              <input type="text" id="cfgP1Remote" name="cfgP1Remote" placeholder="https://printer1.your-tunnel.net">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP1Type">Controller</label>
+              <select id="cfgP1Type" name="cfgP1Type">
+                <option value="moonraker" selected>Klipper / Moonraker</option>
+                <option value="octoprint">OctoPrint</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP1CamStream">Camera Stream URL</label>
+              <input type="text" id="cfgP1CamStream" name="cfgP1CamStream" value="http://192.168.1.124/webcam/?action=stream">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP1CamSnapshot">Camera Snapshot URL</label>
+              <input type="text" id="cfgP1CamSnapshot" name="cfgP1CamSnapshot" value="http://192.168.1.124/webcam/?action=snapshot">
+            </div>
+          </div>
+        </div>
+
+        <!-- Printer 2 Settings -->
+        <div class="config-section">
+          <h3 class="config-section-title highlight-amber">Printer 02 Settings</h3>
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP2Name">Printer Name</label>
+              <input type="text" id="cfgP2Name" name="cfgP2Name" value="FLASHFORGE AD5X">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP2Ip">Local IP Address</label>
+              <input type="text" id="cfgP2Ip" name="cfgP2Ip" value="192.168.1.36">
+            </div>
+            <div class="form-group flex-1">
+              <label for="cfgP2Port">API Port</label>
+              <input type="number" id="cfgP2Port" name="cfgP2Port" value="7125">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-3">
+              <label for="cfgP2Remote">Remote Tunnel URL (Optional)</label>
+              <input type="text" id="cfgP2Remote" name="cfgP2Remote" placeholder="https://printer2.your-tunnel.net">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP2Type">Controller</label>
+              <select id="cfgP2Type" name="cfgP2Type">
+                <option value="moonraker" selected>Klipper / Moonraker</option>
+                <option value="octoprint">OctoPrint</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgP2CamStream">Camera Stream URL</label>
+              <input type="text" id="cfgP2CamStream" name="cfgP2CamStream" value="http://192.168.1.36:8080/?action=stream">
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgP2CamSnapshot">Camera Snapshot URL</label>
+              <input type="text" id="cfgP2CamSnapshot" name="cfgP2CamSnapshot" value="http://192.168.1.36:8080/?action=snapshot">
+            </div>
+          </div>
+        </div>
+
+        <!-- Polling Interval -->
+        <div class="config-section">
+          <div class="form-row">
+            <div class="form-group flex-2">
+              <label for="cfgPollInterval">Telemetry Polling Rate</label>
+              <select id="cfgPollInterval" name="cfgPollInterval">
+                <option value="1000">Fast (Every 1 second)</option>
+                <option value="2000" selected>Balanced (Every 2 seconds)</option>
+                <option value="5000">Eco (Every 5 seconds)</option>
+              </select>
+            </div>
+            <div class="form-group flex-2">
+              <label for="cfgCamMode">Webcam Display Mode</label>
+              <select id="cfgCamMode" name="cfgCamMode">
+                <option value="stream" selected>Live MJPEG Stream</option>
+                <option value="snapshot">Periodic Snapshot Polling</option>
+                <option value="placeholder">High-Res Render</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-outline" id="btnResetConfig">Reset to Defaults</button>
+        <button class="btn-primary" id="btnSaveConfig">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== EMERGENCY STOP CONFIRM MODAL ==================== -->
+  <div class="modal-backdrop" id="estopModal" style="display: none;">
+    <div class="modal-window card-glass estop-modal-window">
+      <div class="modal-header">
+        <h2 class="text-danger">⚠️ EMERGENCY STOP (M112)</h2>
+        <button class="modal-close-btn" id="closeEstopModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="estop-warning-text">
+          Are you sure you want to trigger an Emergency Stop on the active printer?
+        </p>
+        <p class="text-muted">
+          This will instantly cut all heater power, freeze stepper motors, and abort any ongoing print job immediately.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" id="btnCancelEstop">Cancel</button>
+        <button class="btn-danger" id="btnConfirmEstop">CONFIRM EMERGENCY STOP</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ==================== CHROME / EDGE INSECURE CONTENT GUIDE MODAL ==================== -->
+  <div class="modal-backdrop" id="chromeGuideModal" style="display: none;">
+    <div class="modal-window card-glass guide-modal-window">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="icon-cyan">
+            <path d="M23 7l-7 5 7 5V7z"></path>
+            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+          </svg>
+          <h2>How to Enable Direct Camera Stream in Google Chrome</h2>
+        </div>
+        <button class="modal-close-btn" id="closeChromeGuideModal">&times;</button>
+      </div>
+
+      <div class="modal-body guide-body">
+        <p class="guide-intro">
+          Because this dashboard is hosted on Pantheon with <strong>HTTPS</strong>, Google Chrome blocks direct local HTTP video streams (<code id="guidePrinterCamUrl">http://192.168.1.124/...</code>) by default under its <em>Insecure Content (Mixed Content)</em> policy.
+        </p>
+
+        <div class="guide-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Click the Tune / Settings Icon in Chrome's Address Bar</h3>
+            <p>At the top left of Google Chrome, directly to the left of the URL <code>https://dev-nexus3-d.pantheonsite.io/</code>, click the <strong>Tune / Padlock icon</strong>.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Open "Site Settings"</h3>
+            <p>Click on <strong>Site settings</strong> from the menu that appears. A new Chrome settings tab will open.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Set "Insecure Content" to ALLOW</h3>
+            <p>Scroll down to the <strong>Insecure content</strong> permission row and change the dropdown from <strong>Block (default)</strong> to <strong>Allow</strong>.</p>
+          </div>
+        </div>
+
+        <div class="guide-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h3>Reload the Dashboard Tab</h3>
+            <p>Return to this dashboard tab and click <strong>Reload</strong>. The live 30 FPS camera feed will immediately play directly inside Chrome!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-primary" id="btnGuideOpenPopout">Open Camera in Popout Window</button>
+        <button class="btn-outline" id="btnCloseChromeGuide">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.5"></script>
+</body>
+</html>

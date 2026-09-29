@@ -218,7 +218,13 @@ function handlePrinters() {
 
 /* ─── Utilities ─── */
 function requireSession() {
-    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (session_status() === PHP_SESSION_NONE) {
+        session_name('STYXKEY_nexus_session');
+        session_start([
+            'cookie_httponly' => true,
+            'cookie_samesite' => 'Lax'
+        ]);
+    }
     if (!empty($_SESSION['nexus_authenticated'])) {
         return;
     }
