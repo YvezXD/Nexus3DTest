@@ -936,6 +936,20 @@ function renderDualFleet() {
     if (fc2Img) fc2Img.classList.add('grayscale');
     if (fc2Overlay) fc2Overlay.style.display = 'flex';
   }
+
+  // Update Dual Fleet Card Pause Buttons
+  const btnPauseP1 = document.querySelector('.pause-btn-p1');
+  if (btnPauseP1) {
+    const isPaused = p1.state === 'paused';
+    btnPauseP1.textContent = isPaused ? 'Resume' : 'Pause';
+    btnPauseP1.className = `btn-sm ${isPaused ? 'btn-success' : 'btn-danger'} pause-btn-p1`;
+  }
+  const btnPauseP2 = document.querySelector('.pause-btn-p2');
+  if (btnPauseP2) {
+    const isPaused = p2.state === 'paused';
+    btnPauseP2.textContent = isPaused ? 'Resume' : 'Pause';
+    btnPauseP2.className = `btn-sm ${isPaused ? 'btn-success' : 'btn-danger'} pause-btn-p2`;
+  }
 }
 
 function renderFocusView() {
@@ -1319,13 +1333,25 @@ function initEventListeners() {
   document.getElementById('btnCancelEstop')?.addEventListener('click', closeEstopModal);
   document.getElementById('btnConfirmEstop')?.addEventListener('click', triggerEmergencyStop);
 
-  // Job Controls
+  // Job Controls (Focus Hero Card)
   document.getElementById('btnJobPause')?.addEventListener('click', () => sendJobAction('pause'));
   document.getElementById('btnJobResume')?.addEventListener('click', () => sendJobAction('resume'));
   document.getElementById('btnJobCancel')?.addEventListener('click', () => {
     if (confirm('Are you sure you want to cancel the active print job?')) {
       sendJobAction('cancel');
     }
+  });
+
+  // Dual View Fleet Card Pause/Resume Buttons
+  document.querySelector('.pause-btn-p1')?.addEventListener('click', () => {
+    const p1 = STATE.printers.p1;
+    const action = (p1 && p1.state === 'paused') ? 'resume' : 'pause';
+    sendJobAction(action, 'p1');
+  });
+  document.querySelector('.pause-btn-p2')?.addEventListener('click', () => {
+    const p2 = STATE.printers.p2;
+    const action = (p2 && p2.state === 'paused') ? 'resume' : 'pause';
+    sendJobAction(action, 'p2');
   });
 
   // Camera / 2D Bed tabs
@@ -1487,7 +1513,78 @@ function setViewMode(mode) {
   }
 }
 
-/* ==================== HARDWARE / G-CODE DISPATCH ==================== */
+/* ==================== HARDWARE / G-CODE DISPATCH & CLOUD BRIDGE RELAY ==================== */
+
+/**
+ * Dispatches a printer control command (pause, resume, cancel, estop, gcode, temperature).
+ * Architecture:
+ * 1. LAN Mode (on HTTP): Tries direct Moonraker REST API call for zero-latency response (<10ms).
+ * 2. Cloud Mode or HTTPS LAN (Mixed Content): Automatically routes to Pantheon Cloud Bridge Relay
+ *    (index.php?route=api&action=command) where it is picked up by the local bridge daemon in <2s.
+ */
+async function dispatchPrinterCommand(printerId, action, gcode = '', params = {}) {
+  const p = STATE.printers[printerId];
+  if (!p) return false;
+
+  let directSent = false;
+  // If in LAN mode and running on plain HTTP, attempt direct Moonraker REST API call first
+  if (STATE.connectionMode === 'lan' && window.location.protocol !== 'https:' && p.ip && p.port) {
+    try {
+      const baseUrl = p.remoteUrl || `http://${p.ip}:${p.port}`;
+      let endpoint = `${baseUrl}/printer/gcode/script?script=${encodeURIComponent(gcode || action)}`;
+      if (action === 'pause') endpoint = `${baseUrl}/printer/print/pause`;
+      else if (action === 'resume') endpoint = `${baseUrl}/printer/print/resume`;
+      else if (action === 'cancel') endpoint = `${baseUrl}/printer/print/cancel`;
+      else if (action === 'estop') endpoint = `${baseUrl}/printer/emergency_stop`;
+
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 2000);
+      const resp = await fetch(endpoint, { method: 'POST', signal: controller.signal });
+      clearTimeout(t);
+      if (resp.ok) {
+        directSent = true;
+        logTerminal(`// Direct LAN [${action.toUpperCase()}] acknowledged by ${p.name}`, 'success');
+        return true;
+      }
+    } catch (e) {
+      // Direct LAN failed or blocked, proceed to Cloud Bridge Relay
+    }
+  }
+
+  // Cloud Bridge Relay (used for Cloud Mode, HTTPS Mixed Content bypass, or remote access)
+  try {
+    const resp = await fetch('index.php?route=api&action=command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        printer: printerId,
+        action: action,
+        gcode: gcode,
+        params: params
+      })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.status === 'queued') {
+        logTerminal(`// [${action.toUpperCase()}] queued via Cloud Bridge Relay to ${p.name} (executing in <2s)`, 'success');
+        return true;
+      } else {
+        logTerminal(`Command Relay: ${data ? (data.message || data.error) : 'Unknown response'}`, 'warning');
+      }
+    } else {
+      logTerminal(`Cloud Relay HTTP Error: ${resp.status}`, 'error');
+    }
+  } catch (err) {
+    logTerminal(`Failed to relay command [${action.toUpperCase()}]: ${err.message}`, 'error');
+  }
+
+  // Simulation fallback if simulation mode is active
+  if (STATE.simMode) {
+    handleSimulatedGcodeResponse(gcode || action, p);
+  }
+  return false;
+}
 
 async function sendGcode(cmd, targetPrinterId = null) {
   logTerminal(cmd, 'echo');
@@ -1495,26 +1592,12 @@ async function sendGcode(cmd, targetPrinterId = null) {
   const p = STATE.printers[targetKey];
   if (!p) return;
 
-  if (STATE.simMode || !p.online) {
+  if (STATE.simMode) {
     handleSimulatedGcodeResponse(cmd, p);
     return;
   }
 
-  // Attempt Moonraker REST API call
-  const baseUrl = p.remoteUrl || `http://${p.ip}:${p.port}`;
-  try {
-    const resp = await fetch(`${baseUrl}/printer/gcode/script?script=${encodeURIComponent(cmd)}`, {
-      method: 'POST'
-    });
-    if (resp.ok) {
-      logTerminal(`// ${cmd} acknowledged by ${p.name}`, 'success');
-    } else {
-      logTerminal(`Error executing ${cmd}: HTTP ${resp.status}`, 'error');
-    }
-  } catch (err) {
-    logTerminal(`Network / CORS block on ${cmd}: Falling back to local execution.`, 'warning');
-    handleSimulatedGcodeResponse(cmd, p);
-  }
+  await dispatchPrinterCommand(targetKey, 'gcode', cmd);
 }
 
 function handleSimulatedGcodeResponse(cmd, p) {
@@ -1545,39 +1628,43 @@ function jogAxis(axis, distance) {
   renderBedVisualizer();
 }
 
-function setTemperature(type, temp) {
+async function setTemperature(type, temp) {
   const p = STATE.printers[STATE.activePrinterId];
+  if (!p) return;
   if (type === 'ext') {
     const maxAllowed = STATE.activePrinterId === 'p1' ? 370 : 280;
     const safeTemp = Math.max(0, Math.min(maxAllowed, temp));
     p.extruder.target = safeTemp;
-    sendGcode(`M104 S${safeTemp}`);
     logTerminal(`Set Extruder Target to ${safeTemp}°C (Max: ${maxAllowed}°C)`, 'info');
+    await dispatchPrinterCommand(STATE.activePrinterId, 'temperature', `M104 S${safeTemp}`, { type: 'ext', target: 'extruder', temp: safeTemp });
   } else if (type === 'bed') {
     const maxBed = 120;
     const safeBed = Math.max(0, Math.min(maxBed, temp));
     p.bed.target = safeBed;
-    sendGcode(`M140 S${safeBed}`);
     logTerminal(`Set Bed Target to ${safeBed}°C`, 'info');
+    await dispatchPrinterCommand(STATE.activePrinterId, 'temperature', `M140 S${safeBed}`, { type: 'bed', target: 'bed', temp: safeBed });
   }
   renderFocusView();
 }
 
-async function sendJobAction(action) {
-  const p = STATE.printers[STATE.activePrinterId];
-  logTerminal(`Print Job Action: ${action.toUpperCase()}`, 'warning');
+async function sendJobAction(action, targetPrinterId = null) {
+  const printerId = targetPrinterId || STATE.activePrinterId;
+  const p = STATE.printers[printerId];
+  if (!p) return;
+
+  logTerminal(`Print Job Action: ${action.toUpperCase()} requested for ${p.name}`, 'warning');
 
   if (action === 'pause') {
     p.state = 'paused';
-    sendGcode('PAUSE');
+    await dispatchPrinterCommand(printerId, 'pause', 'PAUSE');
   } else if (action === 'resume') {
     p.state = 'printing';
-    sendGcode('RESUME');
+    await dispatchPrinterCommand(printerId, 'resume', 'RESUME');
   } else if (action === 'cancel') {
     p.state = 'ready';
     p.progress = 0;
-    sendGcode('CANCEL_PRINT');
-    clearPrintCache(STATE.activePrinterId);
+    clearPrintCache(printerId);
+    await dispatchPrinterCommand(printerId, 'cancel', 'CANCEL_PRINT');
   }
   renderAll();
 }
@@ -1764,7 +1851,7 @@ async function triggerEmergencyStop() {
   closeEstopModal();
   const targetId = pendingEstopPrinterId || STATE.activePrinterId || 'p1';
   const p = STATE.printers[targetId];
-  const pName = p ? p.name : targetId.toUpperCase();
+  const pName = p ? p.name : (targetId === 'p1' ? 'Printer 1 (QIDI Q2)' : 'Printer 2 (FLASHFORGE AD5X)');
 
   logTerminal(`!!! EMERGENCY STOP M112 TRIGGERED FOR ${pName} !!!`, 'error');
 
@@ -1774,13 +1861,8 @@ async function triggerEmergencyStop() {
     p.state = 'error';
   }
 
-  try {
-    if (p) {
-      const baseUrl = p.remoteUrl || `http://${p.ip}:${p.port}`;
-      fetch(`${baseUrl}/printer/emergency_stop`, { method: 'POST' }).catch(() => {});
-      sendGcode('M112', targetId);
-    }
-  } catch (e) {}
+  // Dispatch immediately via Direct LAN & Cloud Bridge Relay
+  await dispatchPrinterCommand(targetId, 'estop', 'M112');
 
   alert(`EMERGENCY STOP (M112) ACTIVATED on ${pName}:\nHeater power cut and steppers disabled.`);
   renderAll();

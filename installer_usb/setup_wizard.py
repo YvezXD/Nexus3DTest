@@ -129,7 +129,7 @@ def test_pantheon(url, token):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
             "X-API-TOKEN": token,
-            "User-Agent": "curl/8.4.0"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Nexus3D/2.0"
         },
         method="POST"
     )

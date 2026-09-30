@@ -20,8 +20,9 @@ import logging
 import subprocess
 import urllib.request
 import urllib.error
-from urllib.parse import urlparse
-from datetime import datetime
+from urllib.parse import urlparse, quote
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 # ─── Configuration Loader ───
 
@@ -426,111 +427,271 @@ def capture_webcam_snapshot(printer):
         except Exception:
             continue
 
-    return None
+# ─── Remote Cloud Command Execution ───
 
-# ─── Push Telemetry to Cloud ───
+def execute_printer_command(cmd):
+    """
+    Executes a queued command on the target 3D printer via its local Moonraker REST API.
+    Enables Pause, Cancel, Resume, E-Stop, and G-Code to work from anywhere across Cloud & LAN.
+    """
+    printer_id = cmd.get("printer", "p1")
+    action = cmd.get("action", "").lower()
+    gcode = cmd.get("gcode", "").strip()
+
+    # Locate printer configuration
+    target_p = None
+    for p in PRINTERS:
+        if p["id"] == printer_id:
+            target_p = p
+            break
+    if not target_p and PRINTERS:
+        target_p = PRINTERS[0]
+
+    if not target_p:
+        logger.warning(f"Command dropped: Unknown printer ID '{printer_id}'")
+        return False
+
+    ip = target_p["ip"]
+    port = target_p["port"]
+    p_name = target_p["name"]
+
+    logger.info(f"⚡ [COMMAND RECEIVED] Target: {p_name} ({ip}:{port}) | Action: {action.upper()} | GCode: {gcode}")
+
+    endpoints = []
+
+    if action == "estop":
+        # Emergency Stop (M112) - execute immediately
+        endpoints = [
+            f"http://{ip}:{port}/printer/emergency_stop",
+            f"http://{ip}:{port}/printer/gcode/script?script=M112"
+        ]
+    elif action == "pause":
+        endpoints = [
+            f"http://{ip}:{port}/printer/print/pause",
+            f"http://{ip}:{port}/printer/gcode/script?script=PAUSE"
+        ]
+    elif action == "resume":
+        endpoints = [
+            f"http://{ip}:{port}/printer/print/resume",
+            f"http://{ip}:{port}/printer/gcode/script?script=RESUME"
+        ]
+    elif action == "cancel":
+        endpoints = [
+            f"http://{ip}:{port}/printer/print/cancel",
+            f"http://{ip}:{port}/printer/gcode/script?script=CANCEL_PRINT"
+        ]
+    elif action == "temperature":
+        params = cmd.get("params", {})
+        temp_type = params.get("type") or params.get("target") or "ext"
+        temp_val = float(params.get("temp", 0))
+        gc = f"M140 S{temp_val}" if temp_type in ("bed", "heater_bed") else f"M104 S{temp_val}"
+        endpoints = [
+            f"http://{ip}:{port}/printer/gcode/script?script={quote(gc)}"
+        ]
+    elif action == "motors_off":
+        endpoints = [
+            f"http://{ip}:{port}/printer/gcode/script?script=M84"
+        ]
+    elif action == "gcode" and gcode:
+        endpoints = [
+            f"http://{ip}:{port}/printer/gcode/script?script={quote(gcode)}"
+        ]
+
+    success = False
+    for url in endpoints:
+        try:
+            req = urllib.request.Request(
+                url,
+                data=b"",
+                headers={"User-Agent": "Nexus3D-Bridge/2.0"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=1.8) as resp:
+                if resp.status in (200, 204):
+                    logger.info(f"✅ [COMMAND SUCCESS] {action.upper()} executed on {p_name}")
+                    success = True
+                    break
+        except Exception as e:
+            logger.warning(f"⚠️ [COMMAND TRY] {url}: {e}")
+
+    return success
+
+# ─── Push Telemetry to Cloud with Adaptive Timing ───
 
 def push_to_pantheon(payload):
-    """POST telemetry payload and base64 snapshots to Pantheon ingestion API."""
+    """
+    POSTs telemetry and snapshots to Pantheon ingestion API.
+    Returns: (success: bool, message: str, commands: list, upload_duration: float)
+    """
     data_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         PANTHEON_URL,
         data=data_bytes,
         headers={
             "Content-Type": "application/json",
+            "Accept": "application/json, text/plain, */*",
             "Authorization": f"Bearer {API_TOKEN}",
             "X-API-TOKEN": API_TOKEN,
-            "User-Agent": "curl/8.4.0"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Nexus3D-Bridge/2.0",
+            "Connection": "keep-alive"
         },
         method="POST"
     )
 
+    t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=8.0) as resp:
+        with urllib.request.urlopen(req, timeout=6.0) as resp:
             resp_body = resp.read().decode("utf-8", errors="ignore")
+            duration = time.time() - t0
             if resp.status == 200:
-                return True, resp_body
-            return False, f"HTTP {resp.status}: {resp_body[:100]}"
+                commands = []
+                try:
+                    parsed = json.loads(resp_body)
+                    if isinstance(parsed, dict) and "commands" in parsed and isinstance(parsed["commands"], list):
+                        commands = parsed["commands"]
+                except Exception:
+                    pass
+                return True, resp_body, commands, duration
+            return False, f"HTTP {resp.status}: {resp_body[:100]}", [], duration
     except urllib.error.HTTPError as e:
+        duration = time.time() - t0
         err_body = ""
         try:
             err_body = e.read(256).decode("utf-8", errors="ignore")
         except Exception:
             pass
-        return False, f"HTTPError {e.code}: {err_body[:100]}"
+        return False, f"HTTPError {e.code}: {err_body[:100]}", [], duration
     except (urllib.error.URLError, TimeoutError, socket.timeout, Exception) as e:
-        return False, str(e)
+        duration = time.time() - t0
+        return False, str(e), [], duration
 
-# ─── Main Polling Loop ───
+# ─── Parallel Local Harvest ───
 
-def run_bridge():
-    logger.info("======================================================")
-    logger.info("  NEXUS 3D — Local Bridge Daemon v2.0")
-    logger.info(f"  Target Cloud: {PANTHEON_URL}")
-    for p in PRINTERS:
-        logger.info(f"  Monitoring Printer: {p['name']} ({p['ip']}:{p['port']})")
-    logger.info("======================================================")
-
-    last_snapshot_time = 0.0
-
-    while True:
-        try:
-            loop_start = time.time()
-            telemetry_list = []
-            snapshots_dict = {}
-
-            capture_snapshot_now = (loop_start - last_snapshot_time) >= SNAPSHOT_INTERVAL
-
-            for p in PRINTERS:
-                if not p.get("enabled", True):
-                    continue
-
-                # 1. Harvest telemetry
-                tel = query_moonraker(p)
+def harvest_all_telemetry_parallel():
+    """Queries all active printers concurrently to eliminate sequential latency."""
+    enabled_printers = [p for p in PRINTERS if p.get("enabled", True)]
+    results = []
+    with ThreadPoolExecutor(max_workers=min(len(enabled_printers) or 1, 4)) as pool:
+        future_map = {pool.submit(query_moonraker, p): p for p in enabled_printers}
+        for fut in future_map:
+            p = future_map[fut]
+            try:
+                tel = fut.result()
                 if tel:
-                    telemetry_list.append(tel)
+                    results.append(tel)
                 else:
-                    telemetry_list.append({
+                    results.append({
                         "id": p["id"],
                         "name": p["name"],
                         "ip": p["ip"],
                         "online": False,
                         "state": "offline"
                     })
+            except Exception:
+                results.append({
+                    "id": p["id"],
+                    "name": p["name"],
+                    "ip": p["ip"],
+                    "online": False,
+                    "state": "offline"
+                })
 
-                # 2. Capture snapshot if due
-                if capture_snapshot_now:
-                    jpeg_bytes = capture_webcam_snapshot(p)
-                    if jpeg_bytes:
-                        b64_str = base64.b64encode(jpeg_bytes).decode("ascii")
-                        snapshots_dict[p["id"]] = b64_str
+    # Sort to preserve deterministic order (p1 first, p2 second)
+    results.sort(key=lambda x: x.get("id", ""))
+    return results
 
-            if capture_snapshot_now and snapshots_dict:
-                last_snapshot_time = loop_start
+# ─── Main Polling Loop with Low-Bandwidth Resilience ───
 
-            # 3. Push to Pantheon
+def run_bridge():
+    logger.info("======================================================")
+    logger.info("  NEXUS 3D — Local Bridge Daemon v2.1 (Low-Bandwidth Engine)")
+    logger.info(f"  Target Cloud: {PANTHEON_URL}")
+    for p in PRINTERS:
+        logger.info(f"  Monitoring Printer: {p['name']} ({p['ip']}:{p['port']})")
+    logger.info("======================================================")
+
+    last_snapshot_time = 0.0
+    adaptive_snap_interval = SNAPSHOT_INTERVAL
+    consecutive_upload_failures = 0
+
+    while True:
+        try:
+            loop_start = time.time()
+            telemetry_list = harvest_all_telemetry_parallel()
+            snapshots_dict = {}
+
+            # Low-bandwidth optimization:
+            # If upload latency is high or failed, dynamically throttle snapshot frequency
+            # so lightweight telemetry packets (1 KB) are never starved or delayed.
+            capture_snapshot_now = (
+                consecutive_upload_failures == 0 and 
+                (loop_start - last_snapshot_time) >= adaptive_snap_interval
+            )
+
+            if capture_snapshot_now:
+                # Capture snapshots in parallel
+                enabled = [p for p in PRINTERS if p.get("enabled", True)]
+                with ThreadPoolExecutor(max_workers=min(len(enabled) or 1, 4)) as pool:
+                    snap_futures = {pool.submit(capture_webcam_snapshot, p): p["id"] for p in enabled}
+                    for sf in snap_futures:
+                        pid = snap_futures[sf]
+                        try:
+                            jpg = sf.result()
+                            if jpg and len(jpg) > 500:
+                                snapshots_dict[pid] = base64.b64encode(jpg).decode("ascii")
+                        except Exception:
+                            pass
+
+                if snapshots_dict:
+                    last_snapshot_time = loop_start
+
+            # Push to Pantheon
             if telemetry_list:
                 payload = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     "printers": telemetry_list
                 }
                 if snapshots_dict:
                     payload["snapshots"] = snapshots_dict
 
-                success, msg = push_to_pantheon(payload)
+                success, msg, commands, upload_sec = push_to_pantheon(payload)
+
                 if success:
-                    p1_info = telemetry_list[0]
+                    consecutive_upload_failures = 0
+                    p1_info = telemetry_list[0] if telemetry_list else {}
                     status_str = f"state={p1_info.get('state')} progress={p1_info.get('progress')}%"
                     snap_str = f"+ snap({len(snapshots_dict)})" if snapshots_dict else ""
-                    logger.info(f"Pushed telemetry to Pantheon: {status_str} {snap_str}")
+                    logger.info(f"Pushed telemetry to Pantheon: {status_str} {snap_str} ({upload_sec:.2f}s)")
+
+                    # Adaptive Snapshot Timing:
+                    # If uplink took > 1.2s, throttle back snapshots to keep telemetry responsive
+                    if upload_sec > 1.4:
+                        adaptive_snap_interval = min(8.0, adaptive_snap_interval + 1.0)
+                        logger.info(f"Slow uplink detected ({upload_sec:.2f}s). Throttling camera snapshots to every {adaptive_snap_interval:.1f}s")
+                    elif upload_sec < 0.6:
+                        adaptive_snap_interval = max(SNAPSHOT_INTERVAL, adaptive_snap_interval - 0.5)
+
+                    # Execute any queued commands immediately
+                    if commands:
+                        logger.info(f"⚡ Received {len(commands)} remote command(s) from Cloud Dashboard!")
+                        for cmd in commands:
+                            try:
+                                execute_printer_command(cmd)
+                            except Exception as cmd_err:
+                                logger.error(f"Error executing command: {cmd_err}")
+
                 else:
-                    logger.warning(f"Failed to push telemetry to Pantheon: {msg}")
-                    time.sleep(1.5)
+                    consecutive_upload_failures += 1
+                    logger.warning(f"Failed to push telemetry to Pantheon: {msg} (Failures: {consecutive_upload_failures})")
+                    # If failing, back off snapshot interval to give network breathing room
+                    adaptive_snap_interval = min(10.0, adaptive_snap_interval + 2.0)
+                    time.sleep(1.0)
 
             # Sleep remaining time
             elapsed = time.time() - loop_start
-            sleep_time = max(0.5, POLL_INTERVAL - elapsed)
+            sleep_time = max(0.4, POLL_INTERVAL - elapsed)
             time.sleep(sleep_time)
+
         except Exception as e:
             logger.error(f"Unexpected error in bridge loop: {e}")
             time.sleep(2.0)

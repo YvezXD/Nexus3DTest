@@ -11,6 +11,7 @@ function handleApiRequest() {
         case 'push':        handlePush(); break;
         case 'latest':      handleLatest(); break;
         case 'snapshot':    handleSnapshot(); break;
+        case 'command':     handleCommand(); break;
         case 'printers':    handlePrinters(); break;
         case 'clear_cache': handleClearCache(); break;
         default:            jsonResp(['error' => 'Unknown action'], 400);
@@ -84,7 +85,28 @@ function handlePush() {
         }
     }
 
-    jsonResp(['status' => 'ok', 'received' => $received, 'ts' => date('c')]);
+    // Collect pending commands queued for printers by dashboard users
+    $cmdDir = nexusCommandsDir();
+    $commands = [];
+    if (is_dir($cmdDir)) {
+        foreach (glob("$cmdDir/*.json") as $cf) {
+            $cData = json_decode(file_get_contents($cf), true);
+            if ($cData && isset($cData['id'])) {
+                // Keep if recent (< 180s)
+                if (time() - ($cData['created_ts'] ?? 0) < 180) {
+                    $commands[] = $cData;
+                }
+            }
+            @unlink($cf);
+        }
+    }
+
+    jsonResp([
+        'status' => 'ok',
+        'received' => $received,
+        'ts' => date('c'),
+        'commands' => $commands
+    ]);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -214,6 +236,58 @@ function handlePrinters() {
         file_put_contents($manifest, json_encode($body['printers'], JSON_PRETTY_PRINT));
         jsonResp(['status' => 'ok', 'saved' => count($body['printers'])]);
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMMAND  –  Queues printer actions (pause, cancel, estop, gcode)
+   Auth:  PHP session (or Bearer token)
+   ═══════════════════════════════════════════════════════════════════ */
+function handleCommand() {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        jsonResp(['error' => 'POST required'], 405);
+    }
+
+    requireSession();
+
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!$body || empty($body['printer']) || empty($body['action'])) {
+        jsonResp(['error' => 'Invalid command payload: printer and action required'], 400);
+    }
+
+    $printerId = preg_replace('/[^a-zA-Z0-9_-]/', '', $body['printer']);
+    $action = strtolower(trim($body['action']));
+    $gcode = trim($body['gcode'] ?? '');
+
+    $validActions = ['pause', 'resume', 'cancel', 'estop', 'gcode', 'temperature', 'motors_off'];
+    if (!in_array($action, $validActions)) {
+        jsonResp(['error' => "Unsupported action: $action"], 400);
+    }
+
+    ensureNexusDirs();
+    $cmdDir = nexusCommandsDir();
+    $cmdId = 'cmd_' . round(microtime(true) * 1000) . '_' . bin2hex(random_bytes(3));
+
+    $cmdRecord = [
+        'id' => $cmdId,
+        'printer' => $printerId,
+        'action' => $action,
+        'gcode' => $gcode,
+        'params' => $body['params'] ?? [],
+        'created_ts' => time(),
+        'created_iso' => date('c')
+    ];
+
+    $filePath = "$cmdDir/{$cmdId}.json";
+    file_put_contents($filePath, json_encode($cmdRecord, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+    header('Access-Control-Allow-Origin: *');
+    jsonResp([
+        'status' => 'queued',
+        'command_id' => $cmdId,
+        'printer' => $printerId,
+        'action' => $action,
+        'ts' => date('c')
+    ]);
 }
 
 /* ─── Utilities ─── */

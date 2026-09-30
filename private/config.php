@@ -27,8 +27,12 @@ function nexusTelemetryDir() {
     return nexusFilesDir() . '/telemetry';
 }
 
+function nexusCommandsDir() {
+    return nexusFilesDir() . '/commands';
+}
+
 function ensureNexusDirs() {
-    $dirs = [nexusFilesDir(), nexusTelemetryDir()];
+    $dirs = [nexusFilesDir(), nexusTelemetryDir(), nexusCommandsDir()];
     foreach ($dirs as $d) {
         if (!is_dir($d)) {
             mkdir($d, 0755, true);
