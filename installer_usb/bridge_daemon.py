@@ -82,6 +82,14 @@ if os.environ.get("PRINTER_2_ENABLED", "true").lower() == "true":
         "enabled": True,
     })
 
+# ─── Windows Console Encoding Fix ───
+if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ─── Logging Setup ───
 logging.basicConfig(
     level=logging.INFO,
@@ -455,7 +463,7 @@ def execute_printer_command(cmd):
     port = target_p["port"]
     p_name = target_p["name"]
 
-    logger.info(f"⚡ [COMMAND RECEIVED] Target: {p_name} ({ip}:{port}) | Action: {action.upper()} | GCode: {gcode}")
+    logger.info(f">> [COMMAND RECEIVED] Target: {p_name} ({ip}:{port}) | Action: {action.upper()} | GCode: {gcode}")
 
     endpoints = []
 
@@ -508,11 +516,11 @@ def execute_printer_command(cmd):
             )
             with urllib.request.urlopen(req, timeout=1.8) as resp:
                 if resp.status in (200, 204):
-                    logger.info(f"✅ [COMMAND SUCCESS] {action.upper()} executed on {p_name}")
+                    logger.info(f"[OK] [COMMAND SUCCESS] {action.upper()} executed on {p_name}")
                     success = True
                     break
         except Exception as e:
-            logger.warning(f"⚠️ [COMMAND TRY] {url}: {e}")
+            logger.warning(f"[FAIL] [COMMAND TRY] {url}: {e}")
 
     return success
 
@@ -673,7 +681,7 @@ def run_bridge():
 
                     # Execute any queued commands immediately
                     if commands:
-                        logger.info(f"⚡ Received {len(commands)} remote command(s) from Cloud Dashboard!")
+                        logger.info(f">> [COMMANDS] Received {len(commands)} remote command(s) from Cloud Dashboard!")
                         for cmd in commands:
                             try:
                                 execute_printer_command(cmd)
