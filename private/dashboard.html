@@ -56,25 +56,6 @@
         </svg>
         <span>Settings</span>
       </button>
-
-      <div class="estop-group" role="group" aria-label="Emergency Stop Controls">
-        <button class="nav-btn estop-btn estop-p1-btn" id="estopBtnP1" title="Emergency Stop Printer 1 (QIDI Q2)" data-printer="p1">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
-            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          <span>P1 E-STOP</span>
-        </button>
-        <button class="nav-btn estop-btn estop-p2-btn" id="estopBtnP2" title="Emergency Stop Printer 2 (FLASHFORGE AD5X)" data-printer="p2">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
-            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-          <span>P2 E-STOP</span>
-        </button>
-      </div>
     </div>
   </header>
 
@@ -325,7 +306,7 @@
             <span>CANCEL</span>
           </button>
 
-          <!-- Emergency Stop for Both Respective Printers Below Cancel -->
+          <!-- Emergency Stop: E-Stop P1 shown for printer 1, E-Stop P2 shown for printer 2 -->
           <button class="job-control-btn btn-estop estop-card-btn estop-p1" id="jobEstopP1" data-target="p1" title="Emergency Stop Printer 1 (QIDI Q2)">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
               <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
@@ -335,7 +316,7 @@
             <span>E-STOP P1</span>
           </button>
 
-          <button class="job-control-btn btn-estop estop-card-btn estop-p2" id="jobEstopP2" data-target="p2" title="Emergency Stop Printer 2 (FLASHFORGE AD5X)">
+          <button class="job-control-btn btn-estop estop-card-btn estop-p2" id="jobEstopP2" data-target="p2" title="Emergency Stop Printer 2 (FLASHFORGE AD5X)" style="display: none;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
               <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
               <line x1="12" y1="8" x2="12" y2="12"></line>

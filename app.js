@@ -971,6 +971,19 @@ function renderFocusView() {
     }
   }
 
+  // Emergency Stop below Cancel: Only show E-Stop P1 for printer 1, and E-Stop P2 for printer 2
+  const estopP1 = document.getElementById('jobEstopP1');
+  const estopP2 = document.getElementById('jobEstopP2');
+  if (estopP1 && estopP2) {
+    if (STATE.activePrinterId === 'p2') {
+      estopP1.style.display = 'none';
+      estopP2.style.display = 'flex';
+    } else {
+      estopP1.style.display = 'flex';
+      estopP2.style.display = 'none';
+    }
+  }
+
   // Extruder Gauge
   const extTempAct = document.getElementById('extTempActual');
   const extTempTar = document.getElementById('extTempTarget');
@@ -1271,9 +1284,6 @@ function initEventListeners() {
     updateCameraFeed(true);
   });
 
-  // Emergency Stop Modals (Separated P1 and P2)
-  document.getElementById('estopBtnP1')?.addEventListener('click', () => openEstopModal('p1'));
-  document.getElementById('estopBtnP2')?.addEventListener('click', () => openEstopModal('p2'));
   // Dedicated Emergency Stop Buttons below Cancel Button
   document.getElementById('jobEstopP1')?.addEventListener('click', () => openEstopModal('p1'));
   document.getElementById('jobEstopP2')?.addEventListener('click', () => openEstopModal('p2'));
