@@ -57,14 +57,24 @@
         <span>Settings</span>
       </button>
 
-      <button class="nav-btn estop-btn" id="globalEstopBtn" title="Emergency Stop All Printers">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
-          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <span>E-STOP ALL</span>
-      </button>
+      <div class="estop-group" role="group" aria-label="Emergency Stop Controls">
+        <button class="nav-btn estop-btn estop-p1-btn" id="estopBtnP1" title="Emergency Stop Printer 1 (QIDI Q2)" data-printer="p1">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>P1 E-STOP</span>
+        </button>
+        <button class="nav-btn estop-btn estop-p2-btn" id="estopBtnP2" title="Emergency Stop Printer 2 (FLASHFORGE AD5X)" data-printer="p2">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>P2 E-STOP</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -187,6 +197,7 @@
         <div class="fleet-card-footer">
           <button class="btn-sm btn-outline select-printer-btn" data-target="p1">Open Details & Controls</button>
           <button class="btn-sm btn-danger pause-btn-p1">Pause</button>
+          <button class="btn-sm btn-danger estop-card-btn" data-target="p1" title="Emergency Stop Printer 1 (QIDI Q2)">E-Stop P1</button>
         </div>
       </div>
 
@@ -229,6 +240,7 @@
         <div class="fleet-card-footer">
           <button class="btn-sm btn-outline select-printer-btn" data-target="p2">Open Details & Controls</button>
           <button class="btn-sm btn-danger pause-btn-p2">Pause</button>
+          <button class="btn-sm btn-danger estop-card-btn" data-target="p2" title="Emergency Stop Printer 2 (FLASHFORGE AD5X)">E-Stop P2</button>
         </div>
       </div>
     </section>
@@ -330,7 +342,10 @@
               </svg>
               <span>EXTRUDER (NOZZLE)</span>
             </div>
-            <span class="power-tag" id="extPowerTag">PWR: 42%</span>
+            <div class="gauge-status-tags">
+              <span class="max-temp-tag" id="extMaxTag">MAX: 370°C</span>
+              <span class="power-tag" id="extPowerTag">PWR: 42%</span>
+            </div>
           </div>
 
           <div class="gauge-body">
@@ -374,7 +389,10 @@
               </svg>
               <span>HEATED BED</span>
             </div>
-            <span class="power-tag" id="bedPowerTag">PWR: 34%</span>
+            <div class="gauge-status-tags">
+              <span class="max-temp-tag" id="bedMaxTag">MAX: 120°C</span>
+              <span class="power-tag" id="bedPowerTag">PWR: 34%</span>
+            </div>
           </div>
 
           <div class="gauge-body">
@@ -912,15 +930,15 @@ cors_domains:
   <div class="modal-backdrop" id="estopModal" style="display: none;">
     <div class="modal-window card-glass estop-modal-window">
       <div class="modal-header">
-        <h2 class="text-danger">⚠️ EMERGENCY STOP (M112)</h2>
+        <h2 class="text-danger" id="estopModalTitle">⚠️ EMERGENCY STOP (M112)</h2>
         <button class="modal-close-btn" id="closeEstopModal">&times;</button>
       </div>
       <div class="modal-body">
         <p class="estop-warning-text">
-          Are you sure you want to trigger an Emergency Stop on the active printer?
+          Are you sure you want to trigger an Emergency Stop on <strong id="estopTargetPrinterName" style="color: #ef4444;">Printer 1 (QIDI Q2)</strong>?
         </p>
         <p class="text-muted">
-          This will instantly cut all heater power, freeze stepper motors, and abort any ongoing print job immediately.
+          This will instantly cut all heater power, freeze stepper motors, and abort any ongoing print job on this printer immediately. Other printers will remain unaffected.
         </p>
       </div>
       <div class="modal-footer">

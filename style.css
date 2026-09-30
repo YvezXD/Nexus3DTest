@@ -426,6 +426,34 @@ body.light-theme .estop-btn {
   background: #dc2626;
   color: #ffffff;
   border-color: #b91c1c;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+body.light-theme .estop-btn:hover {
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+/* High-Contrast Target Badges & Max Temp in Light Mode */
+body.light-theme .gauge-target-badge {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+body.light-theme .target-badge-label {
+  color: #475569 !important;
+  font-weight: 700;
+}
+
+body.light-theme .target-badge-val {
+  color: #0f172a !important;
+  font-weight: 800;
+}
+
+body.light-theme .max-temp-tag {
+  background: rgba(217, 119, 6, 0.1);
+  border-color: rgba(217, 119, 6, 0.35);
+  color: #b45309;
 }
 
 /* Status Badges & Pills in Light Mode - High Contrast (>5:1 ratio) */
@@ -1066,16 +1094,38 @@ input:checked + .slider:before {
   border-color: var(--accent-purple);
 }
 
+.estop-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .estop-btn {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(185, 28, 28, 0.9));
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.88), rgba(185, 28, 28, 0.96));
   border: 1px solid #f87171;
   color: #fff;
-  box-shadow: 0 0 15px rgba(239, 68, 68, 0.35);
+  font-weight: 700;
+  font-size: 0.76rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
+
 .estop-btn:hover {
   background: linear-gradient(135deg, #ef4444, #dc2626);
-  box-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
-  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+  transform: translateY(-1px);
+}
+
+.estop-p1-btn {
+  border-left: 3px solid #38bdf8;
+}
+
+.estop-p2-btn {
+  border-left: 3px solid #c084fc;
 }
 
 /* ==================== ALERT BANNER ==================== */
@@ -1852,6 +1902,24 @@ input:checked + .slider:before {
 .icon-emerald { color: var(--accent-emerald); }
 .icon-purple { color: var(--accent-purple); }
 
+.gauge-status-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.max-temp-tag {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 0.18rem 0.48rem;
+  border-radius: 4px;
+  color: #fbbf24;
+  letter-spacing: 0.02em;
+}
+
 .power-tag {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -1914,25 +1982,33 @@ input:checked + .slider:before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 94px;
+  max-width: 94px;
+  overflow: visible;
+  text-align: center;
+  pointer-events: none;
 }
 
 .readout-main {
   display: flex;
   align-items: baseline;
-  gap: 0.15rem;
+  justify-content: center;
+  gap: 0.1rem;
 }
 
 .readout-actual {
-  font-size: 1.85rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: #fff;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .readout-unit {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: var(--text-dim);
   font-weight: 600;
+  margin-left: 1px;
 }
 
 .gauge-target-badge {
@@ -3837,8 +3913,9 @@ body.light-theme #terminalInput:focus {
     height: 130px;
   }
 
-  .gauge-actual {
-    font-size: 1.45rem;
+  .gauge-actual,
+  .readout-actual {
+    font-size: 1.32rem !important;
   }
 
   .preset-buttons {

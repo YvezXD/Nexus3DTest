@@ -12,7 +12,8 @@ const STATE = {
   pollTimer: null,
   pollInterval: 2000,
   latency: 18,
-  isLocalLAN: true,
+  isLocalLAN: (window.location.protocol !== 'https:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.'))),
+  targetEstopPrinterId: 'p1',
 
   camMode: 'auto', // 'auto', 'stream', 'snapshot'
   camSnapshotInterval: null,
@@ -116,8 +117,35 @@ function applyTheme(theme) {
 }
 
 function detectHostingEnvironment() {
-  logTerminal('NEXUS 3D v2.0 initialized with Bridge Architecture.', 'info');
-  logTerminal('Polling Pantheon telemetry ingestion endpoint...', 'info');
+  const host = window.location.hostname;
+  const isHttps = window.location.protocol === 'https:';
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+
+  if (isHttps || !isLocalHost) {
+    STATE.isLocalLAN = false;
+    STATE.camMode = 'snapshot';
+    logTerminal(`Remote network detected (${host}). Initialized in Cloud Bridge mode.`, 'info');
+  } else {
+    STATE.isLocalLAN = true;
+    logTerminal(`Local network detected (${host}). Direct LAN mode active.`, 'info');
+    probeLocalLan();
+  }
+}
+
+async function probeLocalLan() {
+  if (window.location.protocol === 'https:') return;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 900);
+    const p1 = STATE.printers.p1;
+    await fetch(`http://${p1.ip}:${p1.port}/printer/info`, { mode: 'no-cors', signal: controller.signal });
+    clearTimeout(timeoutId);
+    STATE.isLocalLAN = true;
+  } catch (e) {
+    STATE.isLocalLAN = false;
+    STATE.camMode = 'snapshot';
+    updateCameraFeed(true);
+  }
 }
 
 function loadStoredConfig() {
@@ -261,7 +289,7 @@ async function pollPrinters() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1200);
       const p1 = STATE.printers.p1;
-      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor`;
+      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan`;
       const resp = await fetch(lanQuery, { signal: controller.signal });
       clearTimeout(timeoutId);
 
@@ -355,6 +383,21 @@ function applyMoonrakerStatus(id, status) {
     p.toolhead.maxAccel = status.toolhead.max_accel || 10000;
   }
 
+  // Part Cooling Fan Speed & Speed Factor
+  let fanSpeed = 0.0;
+  if (status.fan && status.fan.speed !== undefined) {
+    fanSpeed = status.fan.speed;
+  } else if (status['fan_generic cooling_fan'] && status['fan_generic cooling_fan'].speed !== undefined) {
+    fanSpeed = status['fan_generic cooling_fan'].speed;
+  } else if (status['fan_generic part_fan'] && status['fan_generic part_fan'].speed !== undefined) {
+    fanSpeed = status['fan_generic part_fan'].speed;
+  }
+  p.toolhead.fan = Math.round(fanSpeed * 100);
+
+  if (status.gcode_move && status.gcode_move.speed_factor !== undefined) {
+    p.toolhead.speedFactor = Math.round(status.gcode_move.speed_factor * 100);
+  }
+
   // Dismiss offline alert
   const banner = document.getElementById('bridgeBanner');
   if (banner) banner.style.display = 'none';
@@ -412,12 +455,38 @@ function handleBridgeTelemetry(bridgePrinters) {
   }
 
   if (bridgePrinters.p2) {
-    Object.assign(STATE.printers.p2, bridgePrinters.p2);
+    const p2Data = bridgePrinters.p2;
+    const p2 = STATE.printers.p2;
+    p2.online = p2Data.online !== false;
+    const st2 = (p2Data.state || 'ready').toLowerCase();
+    p2.state = st2;
+
+    if (st2 !== 'printing' && st2 !== 'paused') {
+      clearPrintCache('p2', false);
+    } else {
+      p2.filename = p2Data.filename || 'None (Standby)';
+      p2.currentLayer = p2Data.currentLayer || 0;
+      p2.totalLayer = p2Data.totalLayer || 0;
+      p2.progress = p2Data.progress !== undefined ? p2Data.progress : 0;
+      p2.elapsedSeconds = p2Data.elapsedSeconds || 0;
+      p2.totalDurationSeconds = p2Data.totalDurationSeconds || 0;
+      p2.filamentUsedMm = p2Data.filamentUsedMm || 0;
+    }
+
+    if (p2Data.extruder) Object.assign(p2.extruder, p2Data.extruder);
+    if (p2Data.bed) Object.assign(p2.bed, p2Data.bed);
+    if (p2Data.toolhead) Object.assign(p2.toolhead, p2Data.toolhead);
   }
 
-  // If off-network and snapshot URL is present, update camera snapshot safely
-  if (!STATE.isLocalLAN && p1Data.snapshot_url) {
-    loadSingleCloudSnapshot(p1Data.snapshot_url);
+  // If off-network, dynamically load the active printer's snapshot URL
+  const activeData = bridgePrinters[STATE.activePrinterId];
+  if (!STATE.isLocalLAN && activeData && activeData.snapshot_url) {
+    loadSingleCloudSnapshot(activeData.snapshot_url);
+  } else if (!STATE.isLocalLAN && (!activeData || !activeData.online)) {
+    const img = document.getElementById('cameraStreamImg');
+    if (img) {
+      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+    }
   }
 }
 
@@ -475,10 +544,15 @@ function simulateTelemetry(isHardwareFallback = false) {
     p1.toolhead.y = parseFloat((centerY + Math.sin(simTick * 0.6) * radius).toFixed(1));
     p1.toolhead.z = parseFloat((24.0 + (Math.sin(simTick * 0.05) * 0.1)).toFixed(2));
 
+    p1.toolhead.fan = 100;
+    p1.toolhead.speedFactor = 100;
+
     // Chamber temp during print
     p1.chamber.actual = parseFloat((42.0 + (Math.sin(simTick * 0.05) * 0.6)).toFixed(1));
   } else {
     p1.chamber.actual = 28.0;
+    p1.toolhead.fan = 0;
+    p1.toolhead.speedFactor = 100;
   }
 
   if (STATE.printers.p2.online) {
@@ -490,6 +564,8 @@ function simulatePrinter2() {
   const p2 = STATE.printers.p2;
   p2.extruder.actual = parseFloat((24 + Math.sin(simTick * 0.1) * 0.3).toFixed(1));
   p2.bed.actual = parseFloat((23.8 + Math.cos(simTick * 0.1) * 0.2).toFixed(1));
+  p2.toolhead.fan = p2.state === 'printing' ? 100 : 0;
+  p2.toolhead.speedFactor = 100;
 }
 
 /* ==================== RENDERING / UI UPDATES ==================== */
@@ -522,10 +598,20 @@ function updateCameraFeed(forceReload = false) {
   const standbyOverlay = document.getElementById('cameraStandbyOverlay');
   if (!img) return;
 
+  const stockImg = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+
   if (STATE.simMode) {
     if (camSnapshotPoller) { clearInterval(camSnapshotPoller); camSnapshotPoller = null; }
-    img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+    img.src = stockImg;
     if (fpsBadge) fpsBadge.textContent = 'DEMO';
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
+    return;
+  }
+
+  if (!p.online) {
+    if (camSnapshotPoller) { clearInterval(camSnapshotPoller); camSnapshotPoller = null; }
+    img.src = stockImg;
+    if (fpsBadge) fpsBadge.textContent = 'STANDBY';
     if (standbyOverlay) standbyOverlay.style.display = 'none';
     return;
   }
@@ -561,7 +647,6 @@ function switchToLanStreamMode(forceReload = false) {
   };
 
   img.onerror = () => {
-    // If Chrome or Edge blocks mixed-content HTTP stream on HTTPS origin:
     console.warn('LAN camera stream blocked or unreachable. Falling back to Cloud Snapshot (HTTPS).');
     STATE.camMode = 'snapshot';
     switchToCloudSnapshotMode();
@@ -572,13 +657,14 @@ function switchToLanStreamMode(forceReload = false) {
   }
 }
 
+let isSnapshotLoading = false;
+
 function switchToCloudSnapshotMode() {
   const p = STATE.printers[STATE.activePrinterId];
   const img = document.getElementById('cameraStreamImg');
   const snapLabel = document.getElementById('snapModeLabel');
   if (snapLabel) snapLabel.textContent = 'Snapshot (Cloud)';
 
-  // Detach stream handlers so snapshot image loads never trigger stream callbacks
   if (img) {
     img.onerror = null;
     img.onload = null;
@@ -587,9 +673,10 @@ function switchToCloudSnapshotMode() {
   loadSingleCloudSnapshot();
 
   if (!camSnapshotPoller) {
+    // 1100ms polling for low cloud camera latency
     camSnapshotPoller = setInterval(() => {
       loadSingleCloudSnapshot();
-    }, 2000);
+    }, 1100);
   }
 }
 
@@ -599,17 +686,29 @@ function loadSingleCloudSnapshot(customUrl = null) {
   const standbyOverlay = document.getElementById('cameraStandbyOverlay');
   if (!img) return;
 
+  const stockImg = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+  const p = STATE.printers[STATE.activePrinterId];
+  if (!p || !p.online) {
+    img.src = stockImg;
+    if (fpsBadge) fpsBadge.textContent = 'STANDBY';
+    if (standbyOverlay) standbyOverlay.style.display = 'none';
+    return;
+  }
+
+  if (isSnapshotLoading) return;
+  isSnapshotLoading = true;
+
   const snapshotUrl = customUrl || `index.php?route=api&action=snapshot&printer=${STATE.activePrinterId}&t=${Date.now()}`;
   const preloader = new Image();
   preloader.onload = () => {
+    isSnapshotLoading = false;
     img.src = snapshotUrl;
     if (fpsBadge) fpsBadge.textContent = 'CLOUD LIVE';
     if (standbyOverlay) standbyOverlay.style.display = 'none';
   };
   preloader.onerror = () => {
-    if (!img.src || img.src.includes('about:blank')) {
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
-    }
+    isSnapshotLoading = false;
+    img.src = stockImg;
     if (fpsBadge) fpsBadge.textContent = 'STANDBY';
   };
   preloader.src = snapshotUrl;
@@ -813,15 +912,19 @@ function renderFocusView() {
   const extTempAct = document.getElementById('extTempActual');
   const extTempTar = document.getElementById('extTempTarget');
   const extPower = document.getElementById('extPowerTag');
+  const extMaxTag = document.getElementById('extMaxTag');
   const extCircle = document.getElementById('extGaugeCircle');
+
+  const maxExtTemp = STATE.activePrinterId === 'p1' ? 370 : 280;
+  if (extMaxTag) extMaxTag.textContent = `MAX: ${maxExtTemp}°C`;
 
   if (extTempAct) extTempAct.textContent = p.extruder.actual;
   if (extTempTar) extTempTar.textContent = p.extruder.target;
   if (extPower) extPower.textContent = `PWR: ${Math.round(p.extruder.power * 100)}%`;
   if (extCircle) {
     // Circle circumference is 2 * PI * 58 = ~364.4
-    // Scale 0 - 300 deg C
-    const ratio = Math.min(1, Math.max(0, p.extruder.actual / 300));
+    // Scale 0 - maxExtTemp deg C
+    const ratio = Math.min(1, Math.max(0, p.extruder.actual / maxExtTemp));
     extCircle.style.strokeDashoffset = 364.4 - (ratio * 364.4);
   }
 
@@ -853,7 +956,9 @@ function renderFocusView() {
   if (coordZ) coordZ.textContent = p.toolhead.z;
   if (valMaxVel) valMaxVel.textContent = `${p.toolhead.maxVel} mm/s`;
   if (valMaxAccel) valMaxAccel.textContent = `${p.toolhead.maxAccel.toLocaleString()} mm/s²`;
-  if (valFanSpeed) valFanSpeed.textContent = `${p.toolhead.fan}%`;
+  
+  const fan = (p.toolhead && typeof p.toolhead.fan === 'number') ? p.toolhead.fan : 0;
+  if (valFanSpeed) valFanSpeed.textContent = `${fan}%`;
 
   // Chamber Temperature
   const chamberTempVal = document.getElementById('chamberTempVal');
@@ -877,7 +982,6 @@ function renderFocusView() {
 
   const fanSpeedVal = document.getElementById('fanSpeedVal');
   const fanSpeedBar = document.getElementById('fanSpeedBar');
-  const fan = (p.toolhead && typeof p.toolhead.fan === 'number') ? p.toolhead.fan : 0;
   if (fanSpeedVal) fanSpeedVal.textContent = `${fan}%`;
   if (fanSpeedBar) {
     fanSpeedBar.style.width = `${Math.min(100, Math.max(0, fan))}%`;
@@ -1098,8 +1202,15 @@ function initEventListeners() {
   document.getElementById('btnSaveConfig')?.addEventListener('click', saveConfigForm);
   document.getElementById('btnResetConfig')?.addEventListener('click', resetConfigForm);
 
-  // Emergency Stop Modals
-  document.getElementById('globalEstopBtn')?.addEventListener('click', openEstopModal);
+  // Emergency Stop Modals (Separated P1 and P2)
+  document.getElementById('estopBtnP1')?.addEventListener('click', () => openEstopModal('p1'));
+  document.getElementById('estopBtnP2')?.addEventListener('click', () => openEstopModal('p2'));
+  document.querySelectorAll('.estop-card-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const target = e.currentTarget.getAttribute('data-target') || 'p1';
+      openEstopModal(target);
+    });
+  });
   document.getElementById('closeEstopModal')?.addEventListener('click', closeEstopModal);
   document.getElementById('btnCancelEstop')?.addEventListener('click', closeEstopModal);
   document.getElementById('btnConfirmEstop')?.addEventListener('click', triggerEmergencyStop);
@@ -1240,7 +1351,14 @@ function initEventListeners() {
 
 function switchPrinter(printerId) {
   STATE.activePrinterId = printerId;
-  logTerminal(`Switched active focus to ${STATE.printers[printerId].name}`, 'info');
+  const p = STATE.printers[printerId];
+  logTerminal(`Switched active focus to ${p.name}`, 'info');
+
+  const img = document.getElementById('cameraStreamImg');
+  if (img) {
+    img.src = printerId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+  }
+
   updateCameraFeed(true);
   renderAll();
 }
@@ -1267,9 +1385,11 @@ function setViewMode(mode) {
 
 /* ==================== HARDWARE / G-CODE DISPATCH ==================== */
 
-async function sendGcode(cmd) {
+async function sendGcode(cmd, targetPrinterId = null) {
   logTerminal(cmd, 'echo');
-  const p = STATE.printers[STATE.activePrinterId];
+  const targetKey = targetPrinterId || STATE.activePrinterId;
+  const p = STATE.printers[targetKey];
+  if (!p) return;
 
   if (STATE.simMode || !p.online) {
     handleSimulatedGcodeResponse(cmd, p);
@@ -1324,13 +1444,17 @@ function jogAxis(axis, distance) {
 function setTemperature(type, temp) {
   const p = STATE.printers[STATE.activePrinterId];
   if (type === 'ext') {
-    p.extruder.target = temp;
-    sendGcode(`M104 S${temp}`);
-    logTerminal(`Set Extruder Target to ${temp}°C`, 'info');
+    const maxAllowed = STATE.activePrinterId === 'p1' ? 370 : 280;
+    const safeTemp = Math.max(0, Math.min(maxAllowed, temp));
+    p.extruder.target = safeTemp;
+    sendGcode(`M104 S${safeTemp}`);
+    logTerminal(`Set Extruder Target to ${safeTemp}°C (Max: ${maxAllowed}°C)`, 'info');
   } else if (type === 'bed') {
-    p.bed.target = temp;
-    sendGcode(`M140 S${temp}`);
-    logTerminal(`Set Bed Target to ${temp}°C`, 'info');
+    const maxBed = 120;
+    const safeBed = Math.max(0, Math.min(maxBed, temp));
+    p.bed.target = safeBed;
+    sendGcode(`M140 S${safeBed}`);
+    logTerminal(`Set Bed Target to ${safeBed}°C`, 'info');
   }
   renderFocusView();
 }
@@ -1354,26 +1478,7 @@ async function sendJobAction(action) {
   renderAll();
 }
 
-async function triggerEmergencyStop() {
-  closeEstopModal();
-  logTerminal('!!! EMERGENCY STOP M112 TRIGGERED !!!', 'error');
-  
-  // Cut heaters & state on all printers
-  Object.values(STATE.printers).forEach(p => {
-    p.extruder.target = 0;
-    p.bed.target = 0;
-    p.state = 'ready';
-  });
-
-  try {
-    const p1 = STATE.printers.p1;
-    const baseUrl = p1.remoteUrl || `http://${p1.ip}:${p1.port}`;
-    fetch(`${baseUrl}/printer/emergency_stop`, { method: 'POST' }).catch(() => {});
-  } catch (e) {}
-
-  alert('EMERGENCY STOP (M112) ACTIVATED: Heater power cut and steppers disabled.');
-  renderAll();
-}
+// Emergency Stop triggers are handled below per target machine
 
 async function pingPrinter2() {
   logTerminal('Pinging 192.168.1.36:7125...', 'info');
@@ -1497,11 +1602,54 @@ function resetConfigForm() {
   }
 }
 
-function openEstopModal() {
+let pendingEstopPrinterId = 'p1';
+
+function openEstopModal(targetId = null) {
+  const printerId = (typeof targetId === 'string' && targetId) ? targetId : STATE.activePrinterId;
+  pendingEstopPrinterId = printerId;
+  const p = STATE.printers[printerId];
+  const pName = p ? p.name : (printerId === 'p1' ? 'Printer 1 (QIDI Q2)' : 'Printer 2 (FLASHFORGE AD5X)');
+
+  const titleEl = document.getElementById('estopModalTitle');
+  if (titleEl) {
+    titleEl.textContent = `⚠️ EMERGENCY STOP ${printerId.toUpperCase()} (M112)`;
+  }
+  const nameEl = document.getElementById('estopTargetPrinterName');
+  if (nameEl) {
+    nameEl.textContent = pName;
+  }
+
   const m = document.getElementById('estopModal');
   if (m) m.style.display = 'flex';
 }
+
 function closeEstopModal() {
   const m = document.getElementById('estopModal');
   if (m) m.style.display = 'none';
+}
+
+async function triggerEmergencyStop() {
+  closeEstopModal();
+  const targetId = pendingEstopPrinterId || STATE.activePrinterId || 'p1';
+  const p = STATE.printers[targetId];
+  const pName = p ? p.name : targetId.toUpperCase();
+
+  logTerminal(`!!! EMERGENCY STOP M112 TRIGGERED FOR ${pName} !!!`, 'error');
+
+  if (p) {
+    p.extruder.target = 0;
+    p.bed.target = 0;
+    p.state = 'error';
+  }
+
+  try {
+    if (p) {
+      const baseUrl = p.remoteUrl || `http://${p.ip}:${p.port}`;
+      fetch(`${baseUrl}/printer/emergency_stop`, { method: 'POST' }).catch(() => {});
+      sendGcode('M112', targetId);
+    }
+  } catch (e) {}
+
+  alert(`EMERGENCY STOP (M112) ACTIVATED on ${pName}:\nHeater power cut and steppers disabled.`);
+  renderAll();
 }

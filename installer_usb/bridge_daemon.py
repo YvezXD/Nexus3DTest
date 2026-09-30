@@ -52,8 +52,8 @@ load_env()
 PANTHEON_URL = os.environ.get("PANTHEON_URL", "https://dev-nexus3-d.pantheonsite.io/index.php?route=api&action=push")
 API_TOKEN = os.environ.get("API_TOKEN", "nxs_a7f3b9e2d1c4056789abcdef01234567")
 
-POLL_INTERVAL = float(os.environ.get("POLL_INTERVAL_SECONDS", "2.0"))
-SNAPSHOT_INTERVAL = float(os.environ.get("SNAPSHOT_INTERVAL_SECONDS", "2.0"))
+POLL_INTERVAL = float(os.environ.get("POLL_INTERVAL_SECONDS", "1.5"))
+SNAPSHOT_INTERVAL = float(os.environ.get("SNAPSHOT_INTERVAL_SECONDS", "1.2"))
 LOG_FILE = os.environ.get("LOG_FILE", "bridge.log")
 
 # Setup Printers Config
@@ -235,6 +235,7 @@ def query_moonraker(printer):
     objects = (
         "print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status"
         "&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor"
+        "&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan"
     )
     query_path = f"/printer/objects/query?{objects}"
 
@@ -354,6 +355,19 @@ def query_moonraker(printer):
         telemetry["toolhead"]["z"] = round(float(pos[2]), 2)
         telemetry["toolhead"]["maxVel"] = int(th.get("max_velocity", 600))
         telemetry["toolhead"]["maxAccel"] = int(th.get("max_accel", 10000))
+
+    # Part Cooling Fan & Speed Factor
+    fan_speed = 0.0
+    if "fan" in status and status["fan"].get("speed") is not None:
+        fan_speed = float(status["fan"]["speed"])
+    elif "fan_generic cooling_fan" in status and status["fan_generic cooling_fan"].get("speed") is not None:
+        fan_speed = float(status["fan_generic cooling_fan"]["speed"])
+    elif "fan_generic part_fan" in status and status["fan_generic part_fan"].get("speed") is not None:
+        fan_speed = float(status["fan_generic part_fan"]["speed"])
+    telemetry["toolhead"]["fan"] = int(round(fan_speed * 100))
+
+    if "gcode_move" in status and status["gcode_move"].get("speed_factor") is not None:
+        telemetry["toolhead"]["speedFactor"] = int(round(float(status["gcode_move"]["speed_factor"]) * 100))
 
     return telemetry
 
