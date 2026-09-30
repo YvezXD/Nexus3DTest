@@ -12,7 +12,8 @@ const STATE = {
   pollTimer: null,
   pollInterval: 2000,
   latency: 18,
-  isLocalLAN: (window.location.protocol !== 'https:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('192.168.'))),
+  connectionMode: 'cloud', // 'cloud' (default) or 'lan'
+  isLocalLAN: false,
   targetEstopPrinterId: 'p1',
 
   camMode: 'auto', // 'auto', 'stream', 'snapshot'
@@ -116,18 +117,52 @@ function applyTheme(theme) {
   }
 }
 
-function detectHostingEnvironment() {
-  const host = window.location.hostname;
-  const isHttps = window.location.protocol === 'https:';
-  const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+function setConnectionMode(mode, save = true) {
+  const isCloud = mode !== 'lan';
+  STATE.connectionMode = isCloud ? 'cloud' : 'lan';
+  STATE.isLocalLAN = !isCloud;
 
-  if (isHttps || !isLocalHost) {
+  const btnCloud = document.getElementById('btnModeCloud');
+  const btnLan = document.getElementById('btnModeLan');
+  const badgeEl = document.getElementById('connModeInfoBadge');
+  const textEl = document.getElementById('connModeInfoText');
+  const dotEl = document.getElementById('connModeDot');
+
+  if (btnCloud && btnLan) {
+    btnCloud.classList.toggle('active', isCloud);
+    btnLan.classList.toggle('active', !isCloud);
+  }
+
+  if (badgeEl) {
+    badgeEl.textContent = isCloud ? 'Cloud Mode (Default) Active' : 'LAN Mode Active';
+  }
+  if (textEl) {
+    textEl.textContent = isCloud
+      ? 'Telemetry is routed securely through the Pantheon Cloud Ingestion endpoint & local bridge daemon. Works anywhere with zero network or CORS restrictions.'
+      : `Connecting directly to local 3D printer IP endpoints over your local home network (http://${STATE.printers.p1.ip}:${STATE.printers.p1.port}). Requires devices to be on the same local subnet.`;
+  }
+  if (dotEl) {
+    dotEl.className = isCloud ? 'status-indicator-dot online' : 'status-indicator-dot local';
+  }
+
+  if (save) {
+    localStorage.setItem('nexus_connection_mode', STATE.connectionMode);
+    logTerminal(`Connection Mode set to: ${STATE.connectionMode.toUpperCase()} MODE`, 'info');
+  }
+
+  updateNetworkBadge(true, isCloud ? 'Cloud Bridge: Synced' : `LAN Direct Link (${STATE.printers.p1.ip})`);
+}
+
+function detectHostingEnvironment() {
+  const savedMode = localStorage.getItem('nexus_connection_mode') || 'cloud';
+  setConnectionMode(savedMode, false);
+
+  if (STATE.connectionMode === 'cloud') {
     STATE.isLocalLAN = false;
-    STATE.camMode = 'snapshot';
-    logTerminal(`Remote network detected (${host}). Initialized in Cloud Bridge mode.`, 'info');
+    logTerminal('Initialized in Cloud Mode (Default). Pantheon Cloud Telemetry active.', 'info');
   } else {
     STATE.isLocalLAN = true;
-    logTerminal(`Local network detected (${host}). Direct LAN mode active.`, 'info');
+    logTerminal('Initialized in Direct LAN Mode. Probing local printer IPs.', 'info');
     probeLocalLan();
   }
 }
@@ -173,6 +208,8 @@ function loadStoredConfig() {
         STATE.printers.p2.camSnapshotUrl = parsed.printers.p2.camSnapshotUrl || STATE.printers.p2.camSnapshotUrl;
       }
       if (parsed.pollInterval) STATE.pollInterval = parsed.pollInterval;
+      if (parsed.connectionMode) STATE.connectionMode = parsed.connectionMode;
+      if (parsed.camMode) STATE.camMode = parsed.camMode;
       if (parsed.simMode !== undefined) {
         STATE.simMode = parsed.simMode;
         const toggle = document.getElementById('simModeToggle');
@@ -206,7 +243,9 @@ function saveConfigToStorage() {
         }
       },
       pollInterval: STATE.pollInterval,
-      simMode: STATE.simMode
+      simMode: STATE.simMode,
+      connectionMode: STATE.connectionMode,
+      camMode: STATE.camMode
     };
     localStorage.setItem('nexus_3d_config', JSON.stringify(payload));
   } catch (e) {
@@ -264,27 +303,8 @@ async function pollPrinters() {
 
   let synced = false;
 
-  // 1. Primary: Query Pantheon Cloud Ingestion endpoint
-  // Works identically on Google Chrome, Edge, Safari, and mobile without Private Network Access or CORS blocks
-  try {
-    const resp = await fetch('index.php?route=api&action=latest', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.status === 'ok' && data.printers && data.printers.p1) {
-        handleBridgeTelemetry(data.printers);
-        synced = true;
-      }
-    }
-  } catch (cloudErr) {
-    console.warn('Pantheon poll error:', cloudErr);
-  }
-
-  // 2. Fallback: If not on HTTPS (e.g. running locally) and cloud is not responding, probe Moonraker directly
-  if (!synced && window.location.protocol !== 'https:') {
+  if (STATE.connectionMode === 'lan') {
+    // Mode: Direct LAN Link
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1200);
@@ -299,16 +319,59 @@ async function pollPrinters() {
           applyMoonrakerStatus('p1', data.result.status);
           synced = true;
           STATE.isLocalLAN = true;
-          updateNetworkBadge(true, `LAN: Direct Link (${p1.ip})`);
+          updateNetworkBadge(true, `LAN Direct Link (${p1.ip})`);
         }
       }
     } catch (lanErr) {
       synced = false;
     }
+  } else {
+    // Mode: Cloud Ingestion (Default) — Query Pantheon Cloud Ingestion endpoint
+    try {
+      const resp = await fetch('index.php?route=api&action=latest', {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.status === 'ok' && data.printers && data.printers.p1) {
+          handleBridgeTelemetry(data.printers);
+          synced = true;
+          updateNetworkBadge(true, 'Cloud Bridge: Synced');
+        }
+      }
+    } catch (cloudErr) {
+      console.warn('Pantheon cloud poll error:', cloudErr);
+    }
+
+    // Secondary fallback to LAN only if locally hosted (not on HTTPS)
+    if (!synced && window.location.protocol !== 'https:') {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const p1 = STATE.printers.p1;
+        const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan`;
+        const resp = await fetch(lanQuery, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.result && data.result.status) {
+            applyMoonrakerStatus('p1', data.result.status);
+            synced = true;
+            updateNetworkBadge(true, `LAN Fallback (${p1.ip})`);
+          }
+        }
+      } catch (lanErr) {
+        synced = false;
+      }
+    }
   }
 
   if (!synced) {
-    showBridgeOffline('Bridge Offline: No telemetry from local bridge or LAN.');
+    const modeName = STATE.connectionMode === 'lan' ? 'LAN direct link' : 'Pantheon cloud bridge';
+    showBridgeOffline(`Bridge Offline: No telemetry from ${modeName}.`);
   }
 
   STATE.latency = Math.max(12, Math.floor(performance.now() - start));
@@ -949,16 +1012,12 @@ function renderFocusView() {
   const coordZ = document.getElementById('coordZ');
   const valMaxVel = document.getElementById('valMaxVel');
   const valMaxAccel = document.getElementById('valMaxAccel');
-  const valFanSpeed = document.getElementById('valFanSpeed');
 
   if (coordX) coordX.textContent = p.toolhead.x;
   if (coordY) coordY.textContent = p.toolhead.y;
   if (coordZ) coordZ.textContent = p.toolhead.z;
   if (valMaxVel) valMaxVel.textContent = `${p.toolhead.maxVel} mm/s`;
   if (valMaxAccel) valMaxAccel.textContent = `${p.toolhead.maxAccel.toLocaleString()} mm/s²`;
-  
-  const fan = (p.toolhead && typeof p.toolhead.fan === 'number') ? p.toolhead.fan : 0;
-  if (valFanSpeed) valFanSpeed.textContent = `${fan}%`;
 
   // Chamber Temperature
   const chamberTempVal = document.getElementById('chamberTempVal');
@@ -970,7 +1029,7 @@ function renderFocusView() {
     }
   }
 
-  // Non-interactable Speeds & Fan Readings
+  // Non-interactable Speeds (Speed Factor)
   const speedFactorVal = document.getElementById('speedFactorVal');
   const speedFactorBar = document.getElementById('speedFactorBar');
   const spd = (p.toolhead && typeof p.toolhead.speedFactor === 'number') ? p.toolhead.speedFactor : 100;
@@ -978,13 +1037,6 @@ function renderFocusView() {
   if (speedFactorBar) {
     const pct = Math.min(100, Math.max(0, ((spd - 50) / 150) * 100));
     speedFactorBar.style.width = `${pct}%`;
-  }
-
-  const fanSpeedVal = document.getElementById('fanSpeedVal');
-  const fanSpeedBar = document.getElementById('fanSpeedBar');
-  if (fanSpeedVal) fanSpeedVal.textContent = `${fan}%`;
-  if (fanSpeedBar) {
-    fanSpeedBar.style.width = `${Math.min(100, Math.max(0, fan))}%`;
   }
 
   // Stream preview HUD
@@ -1197,14 +1249,35 @@ function initEventListeners() {
   document.getElementById('closeGuideModal')?.addEventListener('click', closeGuideModal);
   document.getElementById('guideUnderstoodBtn')?.addEventListener('click', closeGuideModal);
 
-  document.getElementById('openConfigBtn')?.addEventListener('click', openConfigModal);
+  document.getElementById('openConfigBtn')?.addEventListener('click', () => openConfigModal('siteOptionsPanel'));
   document.getElementById('closeConfigModal')?.addEventListener('click', closeConfigModal);
   document.getElementById('btnSaveConfig')?.addEventListener('click', saveConfigForm);
   document.getElementById('btnResetConfig')?.addEventListener('click', resetConfigForm);
 
+  // Settings Tab Navigation (Separated Site Options and Printer Configs)
+  document.getElementById('tabBtnSiteOptions')?.addEventListener('click', () => switchSettingsTab('siteOptionsPanel'));
+  document.getElementById('tabBtnP1Config')?.addEventListener('click', () => switchSettingsTab('p1ConfigPanel'));
+  document.getElementById('tabBtnP2Config')?.addEventListener('click', () => switchSettingsTab('p2ConfigPanel'));
+
+  // Connection Mode Switch (Cloud Mode Default vs LAN Mode)
+  document.getElementById('btnModeCloud')?.addEventListener('click', () => {
+    setConnectionMode('cloud', true);
+    startTelemetryPolling();
+    updateCameraFeed(true);
+  });
+  document.getElementById('btnModeLan')?.addEventListener('click', () => {
+    setConnectionMode('lan', true);
+    startTelemetryPolling();
+    updateCameraFeed(true);
+  });
+
   // Emergency Stop Modals (Separated P1 and P2)
   document.getElementById('estopBtnP1')?.addEventListener('click', () => openEstopModal('p1'));
   document.getElementById('estopBtnP2')?.addEventListener('click', () => openEstopModal('p2'));
+  // Dedicated Emergency Stop Buttons below Cancel Button
+  document.getElementById('jobEstopP1')?.addEventListener('click', () => openEstopModal('p1'));
+  document.getElementById('jobEstopP2')?.addEventListener('click', () => openEstopModal('p2'));
+
   document.querySelectorAll('.estop-card-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const target = e.currentTarget.getAttribute('data-target') || 'p1';
@@ -1531,26 +1604,51 @@ function closeGuideModal() {
   if (m) m.style.display = 'none';
 }
 
-function openConfigModal() {
+function switchSettingsTab(tabId) {
+  const tabs = [
+    { btn: 'tabBtnSiteOptions', panel: 'siteOptionsPanel' },
+    { btn: 'tabBtnP1Config', panel: 'p1ConfigPanel' },
+    { btn: 'tabBtnP2Config', panel: 'p2ConfigPanel' }
+  ];
+  tabs.forEach(t => {
+    const b = document.getElementById(t.btn);
+    const p = document.getElementById(t.panel);
+    const isActive = (t.panel === tabId || t.btn === tabId);
+    if (b) {
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    }
+    if (p) {
+      p.style.display = isActive ? 'flex' : 'none';
+      p.classList.toggle('active', isActive);
+    }
+  });
+}
+
+function openConfigModal(initialTab = 'siteOptionsPanel') {
   const m = document.getElementById('configModal');
   if (!m) return;
   m.style.display = 'flex';
 
-  document.getElementById('cfgP1Name').value = STATE.printers.p1.name;
-  document.getElementById('cfgP1Ip').value = STATE.printers.p1.ip;
-  document.getElementById('cfgP1Port').value = STATE.printers.p1.port;
-  document.getElementById('cfgP1Remote').value = STATE.printers.p1.remoteUrl;
-  document.getElementById('cfgP1CamStream').value = STATE.printers.p1.camStreamUrl;
-  document.getElementById('cfgP1CamSnapshot').value = STATE.printers.p1.camSnapshotUrl;
+  switchSettingsTab(initialTab);
+  setConnectionMode(STATE.connectionMode || 'cloud', false);
 
-  document.getElementById('cfgP2Name').value = STATE.printers.p2.name;
-  document.getElementById('cfgP2Ip').value = STATE.printers.p2.ip;
-  document.getElementById('cfgP2Port').value = STATE.printers.p2.port;
-  document.getElementById('cfgP2Remote').value = STATE.printers.p2.remoteUrl;
-  document.getElementById('cfgP2CamStream').value = STATE.printers.p2.camStreamUrl;
-  document.getElementById('cfgP2CamSnapshot').value = STATE.printers.p2.camSnapshotUrl;
+  if (document.getElementById('cfgP1Name')) document.getElementById('cfgP1Name').value = STATE.printers.p1.name;
+  if (document.getElementById('cfgP1Ip')) document.getElementById('cfgP1Ip').value = STATE.printers.p1.ip;
+  if (document.getElementById('cfgP1Port')) document.getElementById('cfgP1Port').value = STATE.printers.p1.port;
+  if (document.getElementById('cfgP1Remote')) document.getElementById('cfgP1Remote').value = STATE.printers.p1.remoteUrl;
+  if (document.getElementById('cfgP1CamStream')) document.getElementById('cfgP1CamStream').value = STATE.printers.p1.camStreamUrl;
+  if (document.getElementById('cfgP1CamSnapshot')) document.getElementById('cfgP1CamSnapshot').value = STATE.printers.p1.camSnapshotUrl;
 
-  document.getElementById('cfgPollInterval').value = STATE.pollInterval;
+  if (document.getElementById('cfgP2Name')) document.getElementById('cfgP2Name').value = STATE.printers.p2.name;
+  if (document.getElementById('cfgP2Ip')) document.getElementById('cfgP2Ip').value = STATE.printers.p2.ip;
+  if (document.getElementById('cfgP2Port')) document.getElementById('cfgP2Port').value = STATE.printers.p2.port;
+  if (document.getElementById('cfgP2Remote')) document.getElementById('cfgP2Remote').value = STATE.printers.p2.remoteUrl;
+  if (document.getElementById('cfgP2CamStream')) document.getElementById('cfgP2CamStream').value = STATE.printers.p2.camStreamUrl;
+  if (document.getElementById('cfgP2CamSnapshot')) document.getElementById('cfgP2CamSnapshot').value = STATE.printers.p2.camSnapshotUrl;
+
+  if (document.getElementById('cfgPollInterval')) document.getElementById('cfgPollInterval').value = STATE.pollInterval;
+  if (document.getElementById('cfgCamMode')) document.getElementById('cfgCamMode').value = STATE.camMode || 'stream';
 }
 function closeConfigModal() {
   const m = document.getElementById('configModal');
@@ -1573,6 +1671,9 @@ function saveConfigForm() {
   STATE.printers.p2.camSnapshotUrl = document.getElementById('cfgP2CamSnapshot').value.trim() || STATE.printers.p2.camSnapshotUrl;
 
   STATE.pollInterval = parseInt(document.getElementById('cfgPollInterval').value, 10) || 2000;
+  if (document.getElementById('cfgCamMode')) {
+    STATE.camMode = document.getElementById('cfgCamMode').value;
+  }
 
   saveConfigToStorage();
   closeConfigModal();

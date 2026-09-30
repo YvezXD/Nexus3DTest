@@ -85,13 +85,14 @@ TestProject/
 │   ├── auth.php              # Login credentials verification & session setter
 │   └── api.php               # Ingestion (push), query (latest), & snapshot serve
 └── installer_usb/
-    ├── install.bat           # 1-click Windows installer with portable Python downloader
-    ├── setup_wizard.py       # Interactive terminal wizard with live network diagnostics
-    ├── bridge_daemon.py      # Standalone passive relay daemon (zero dependencies)
+    ├── install.bat           # Self-contained single-file installer & setup wizard
+    ├── uninstall.bat         # Self-contained single-file uninstaller & service removal
+    ├── bridge_daemon.py      # Standalone passive relay daemon (zero external dependencies)
     ├── start_bridge.bat      # Manual background launcher
     ├── stop_bridge.bat       # Process stopper
     ├── status.bat            # Live status & log inspector
-    ├── install.sh            # Linux/systemd auto-start installer
+    ├── enable_autostart.bat  # Enable Windows automatic startup
+    ├── disable_autostart.bat # Disable Windows automatic startup
     ├── config.env.example    # Configuration reference
     └── README_USB.txt        # Plain-text flash drive documentation
 ```

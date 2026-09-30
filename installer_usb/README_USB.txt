@@ -11,16 +11,16 @@ Follow these simple steps on the computer located on your home network:
 
 2. RUN THE INSTALLER (ONCE):
    Double-click:
-       install.bat   (on Windows)
-   Or run:
-       bash install.sh   (on Linux / Raspberry Pi)
+       install.bat   (Self-contained single-file installer)
+   Or run with Python on Linux / macOS:
+       python3 -x install.bat
 
    * What happens automatically:
-     - The installer checks for Python. If not found, it automatically
-       downloads a portable, zero-install Python runtime.
-     - An interactive Setup Wizard opens.
+     - The single-file installer checks for Python. If not found on Windows,
+       it automatically downloads a portable, zero-install Python runtime.
+     - An interactive Setup Wizard opens directly from install.bat.
      - Pre-configured smart defaults are already filled in.
-     - The installer tests live connectivity to your QIDI Q2 printer,
+     - The installer tests live connectivity to your 3D printers,
        the camera stream, and your Pantheon Cloud web app.
      - It registers the bridge to start automatically whenever your
        computer boots up (in the background, silently).
@@ -46,8 +46,7 @@ Follow these simple steps on the computer located on your home network:
                            the latest log output.
 - enable_autostart.bat   : One-click enables automatic startup on Windows boot.
 - disable_autostart.bat  : Disables automatic startup on Windows boot.
-- uninstall.bat          : Uninstalls the bridge daemon, removes Windows Startup
-                           launcher, and cleans up local configuration.
-- uninstall.sh           : Uninstalls the daemon on Linux / Raspberry Pi.
+- uninstall.bat          : Self-contained single-file uninstaller. Stops daemon,
+                           removes startup tasks, and cleans configuration.
 - bridge.log             : Text file containing all recent activity logs.
 ========================================================================
