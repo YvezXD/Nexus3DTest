@@ -1,8 +1,8 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
 echo ========================================================================
-echo   NEXUS 3D Bridge — Process & Connection Status
+echo   NEXUS 3D Bridge — Process ^& Connection Status
 echo ========================================================================
 echo.
 
@@ -11,10 +11,10 @@ for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":58921" ^| findstr "L
     set "FOUND_PID=%%a"
 )
 
-if defined FOUND_PID (
-    echo [STATUS] Bridge Daemon is RUNNING (Port 58921 active, PID: %FOUND_PID%)
-) else (
+if "!FOUND_PID!"=="" (
     echo [STATUS] Bridge Daemon is NOT running.
+) else (
+    echo [STATUS] Bridge Daemon is RUNNING [Port 58921 active, PID: !FOUND_PID!]
 )
 
 echo.
