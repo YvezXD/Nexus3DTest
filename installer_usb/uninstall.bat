@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title NEXUS 3D Bridge — Daemon Uninstaller
+title NEXUS 3D Bridge v2.1 — Daemon Uninstaller
 cd /d "%~dp0"
 
 :: 1. Detect Python executable
@@ -24,7 +24,7 @@ if %ERRORLEVEL% equ 0 (
 
 :: 2. Fallback pure-batch uninstallation if Python is missing
 echo ========================================================================
-echo   NEXUS 3D — Bridge Daemon Uninstaller (Direct Mode)
+echo   NEXUS 3D — Bridge Daemon Uninstaller v2.1 (Direct Mode)
 echo ========================================================================
 echo.
 
@@ -65,6 +65,14 @@ set /p "DEL_LOG=Delete bridge log file (bridge.log)? (y/N): "
 if /i "!DEL_LOG!"=="y" (
     if exist "bridge.log" del /f /q "bridge.log"
     echo [OK] Deleted bridge.log
+)
+
+if exist "python_runtime" (
+    set /p "DEL_PY=Delete downloaded portable Python runtime (python_runtime)? (y/N): "
+    if /i "!DEL_PY!"=="y" (
+        rmdir /s /q "python_runtime"
+        echo [OK] Deleted python_runtime
+    )
 )
 
 echo.

@@ -14,7 +14,7 @@ import socket
 import urllib.request
 import urllib.error
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ANSI Colors for clean terminal UI
 class C:
@@ -26,9 +26,15 @@ class C:
     DIM = "\033[2m"
     RESET = "\033[0m"
 
-# Enable Windows VT100 color support
+# Enable Windows VT100 color support and UTF-8 console encoding
 if sys.platform == "win32":
     os.system("")
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 def ask(prompt, default):
     text = f"{C.CYAN}?{C.RESET} {prompt} [{C.BOLD}{default}{C.RESET}]: "
@@ -51,12 +57,16 @@ def banner():
   / |/ / __/ _ \/ / / / __/ /  / _/ // / /__/ _ \____(_)__/ /__ ____   
  /    / _// // / /_/ /\ \/ /__/ _/ // / / _/ // /___/ / _  / -_) __/   
 /_/|_/___/____/\____/___/____/_/ /_//_/_/ /____/   /_/\_,_/\__/_/      
-           Fleet Telemetry Bridge — Setup Wizard
+           Fleet Telemetry Bridge v2.1 — Setup Wizard
+     [Low-Bandwidth Adaptive Engine + Bidirectional Command Relay]
 ========================================================================{C.RESET}
 """)
-    print("Welcome! This installer sets up the local NEXUS 3D bridge daemon.")
-    print("It allows your Pantheon Cloud Web Dashboard to monitor your 3D printers")
-    print("remotely with ZERO modifications to your printers.\n")
+    print("Welcome! This installer sets up the local NEXUS 3D bridge daemon v2.1.")
+    print("New Features in v2.1:")
+    print("  * Dual Fleet Support: QIDI Q2 + FLASHFORGE AD5X parallel polling")
+    print("  * Low-Bandwidth Adaptive Engine: dynamic snapshot throttling prevents freezes")
+    print("  * Bidirectional Remote Control: Pause, Resume, Cancel, E-STOP & G-Code")
+    print("  * Zero-touch Windows Startup registration (silent background auto-run)\n")
 
 def load_existing_env(script_dir):
     env_path = os.path.join(script_dir, "config.env")
@@ -109,7 +119,7 @@ def test_webcam(url):
 def test_pantheon(url, token):
     print(f"  • Probing Pantheon Cloud Ingestion API...", end="", flush=True)
     test_payload = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "printers": [
             {
                 "id": "p1",
@@ -127,9 +137,10 @@ def test_pantheon(url, token):
         data=data_bytes,
         headers={
             "Content-Type": "application/json",
+            "Accept": "application/json, text/plain, */*",
             "Authorization": f"Bearer {token}",
             "X-API-TOKEN": token,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Nexus3D/2.0"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Nexus3D-Bridge/2.1"
         },
         method="POST"
     )

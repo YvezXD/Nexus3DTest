@@ -1,9 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
-title NEXUS 3D Bridge — Disable Windows Startup Auto-Run
+title NEXUS 3D Bridge v2.1 — Disable Windows Startup Auto-Run
 
 echo ========================================================================
-echo   NEXUS 3D — Disable Windows Startup Auto-Run
+echo   NEXUS 3D Bridge v2.1 — Disable Windows Startup Auto-Run
 echo ========================================================================
 echo.
 

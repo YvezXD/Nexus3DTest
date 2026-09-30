@@ -1,10 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
-title NEXUS 3D Bridge — Installer & Setup Wizard
+title NEXUS 3D Bridge v2.1 — Installer and Setup Wizard
 cd /d "%~dp0"
 
 echo ========================================================================
-echo   NEXUS 3D — Fleet Telemetry Bridge Installer
+echo   NEXUS 3D — Fleet Telemetry Bridge Installer v2.1
+echo   [Low-Bandwidth Adaptive Engine + Bidirectional Command Relay]
 echo ========================================================================
 echo.
 
@@ -37,7 +38,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "(New-Object System.Net.WebClient).DownloadFile($url, $zip);" ^
     "Write-Host 'Extracting portable runtime...';" ^
     "Expand-Archive -Path $zip -DestinationPath 'python_runtime' -Force;" ^
-    "Remove-Item $zip -Force;"
+    "Remove-Item $zip -Force;" ^
+    "$pth = Get-Item 'python_runtime\python*._pth' -ErrorAction SilentlyContinue;" ^
+    "if ($pth) { Add-Content $pth.FullName '..'; Add-Content $pth.FullName 'import site' }"
 
 if exist "python_runtime\python.exe" (
     set "PYTHON_CMD=python_runtime\python.exe"

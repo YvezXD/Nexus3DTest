@@ -1,6 +1,7 @@
 @echo off
 setlocal
-echo [*] Stopping NEXUS 3D Bridge Daemon...
+title NEXUS 3D Bridge v2.1 — Stop Daemon
+echo [*] Stopping NEXUS 3D Bridge Daemon v2.1...
 
 set "STOPPED_COUNT=0"
 for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":58921" ^| findstr "LISTENING"') do (

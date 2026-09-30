@@ -22,9 +22,15 @@ class C:
     DIM = "\033[2m"
     RESET = "\033[0m"
 
-# Windows color support
+# Windows color support and UTF-8 console encoding
 if sys.platform == "win32":
     os.system("")
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 def ask(prompt, default):
     text = f"{C.CYAN}?{C.RESET} {prompt} [{C.BOLD}{default}{C.RESET}]: "
@@ -47,7 +53,7 @@ def banner():
   / |/ / __/ _ \/ / / / __/ /  / _/ // / /__/ _ \____(_)__/ /__ ____   
  /    / _// // / /_/ /\ \/ /__/ _/ // / / _/ // /___/ / _  / -_) __/   
 /_/|_/___/____/\____/___/____/_/ /_//_/_/ /____/   /_/\_,_/\__/_/      
-              Bridge Daemon — Uninstaller Wizard
+           Bridge Daemon v2.1 — Uninstaller Wizard
 ========================================================================{C.RESET}
 """)
     print("This utility will stop the running NEXUS 3D bridge daemon, remove the")
