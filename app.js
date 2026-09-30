@@ -302,76 +302,84 @@ async function pollPrinters() {
   }
 
   let synced = false;
+  let directLanSuccess = false;
 
-  if (STATE.connectionMode === 'lan') {
-    // Mode: Direct LAN Link
+  // 1. If in LAN mode or local environment, attempt DIRECT LAN queries to BOTH printers
+  if (STATE.connectionMode === 'lan' || window.location.protocol !== 'https:') {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1200);
       const p1 = STATE.printers.p1;
-      const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan`;
-      const resp = await fetch(lanQuery, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      const p2 = STATE.printers.p2;
+      const lanQueryObjects = 'print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan&fan_generic%20fanM106';
 
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.result && data.result.status) {
-          applyMoonrakerStatus('p1', data.result.status);
-          synced = true;
-          STATE.isLocalLAN = true;
-          updateNetworkBadge(true, `LAN Direct Link (${p1.ip})`);
-        }
+      const queryPrinterLan = async (p, id) => {
+        try {
+          const controller = new AbortController();
+          const tId = setTimeout(() => controller.abort(), 2000);
+          const resp = await fetch(`http://${p.ip}:${p.port}/printer/objects/query?${lanQueryObjects}`, {
+            signal: controller.signal
+          });
+          clearTimeout(tId);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data && data.result && data.result.status) {
+              applyMoonrakerStatus(id, data.result.status);
+              return true;
+            }
+          }
+        } catch (e) {}
+        return false;
+      };
+
+      const [r1, r2] = await Promise.all([
+        queryPrinterLan(p1, 'p1'),
+        queryPrinterLan(p2, 'p2')
+      ]);
+
+      if (r1 || r2) {
+        directLanSuccess = true;
+        synced = true;
+        STATE.isLocalLAN = true;
+        updateNetworkBadge(true, `LAN Direct Link (192.168.1.x)`);
       }
     } catch (lanErr) {
-      synced = false;
+      // Direct browser fetch blocked or failed
     }
-  } else {
-    // Mode: Cloud Ingestion (Default) — Query Pantheon Cloud Ingestion endpoint
+  }
+
+  // 2. Fallback / Cloud Ingestion: If direct LAN query failed or was blocked by browser security (e.g. Mixed Content on HTTPS),
+  // OR if in Cloud mode: fetch latest bridge telemetry from the local bridge daemon via Pantheon relay!
+  if (!synced) {
     try {
+      const controller = new AbortController();
+      const tId = setTimeout(() => controller.abort(), 2500);
       const resp = await fetch('index.php?route=api&action=latest', {
         headers: { 'Accept': 'application/json' },
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: controller.signal
       });
+      clearTimeout(tId);
 
       if (resp.ok) {
         const data = await resp.json();
-        if (data.status === 'ok' && data.printers && data.printers.p1) {
+        if (data.status === 'ok' && data.printers && (data.printers.p1 || data.printers.p2)) {
           handleBridgeTelemetry(data.printers);
           synced = true;
-          updateNetworkBadge(true, 'Cloud Bridge: Synced');
+          if (STATE.connectionMode === 'lan') {
+            STATE.isLocalLAN = true;
+            updateNetworkBadge(true, 'LAN Mode (Bridge Relay Active)');
+          } else {
+            updateNetworkBadge(true, 'Cloud Bridge: Synced');
+          }
         }
       }
     } catch (cloudErr) {
-      console.warn('Pantheon cloud poll error:', cloudErr);
-    }
-
-    // Secondary fallback to LAN only if locally hosted (not on HTTPS)
-    if (!synced && window.location.protocol !== 'https:') {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const p1 = STATE.printers.p1;
-        const lanQuery = `http://${p1.ip}:${p1.port}/printer/objects/query?print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan`;
-        const resp = await fetch(lanQuery, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (resp.ok) {
-          const data = await resp.json();
-          if (data && data.result && data.result.status) {
-            applyMoonrakerStatus('p1', data.result.status);
-            synced = true;
-            updateNetworkBadge(true, `LAN Fallback (${p1.ip})`);
-          }
-        }
-      } catch (lanErr) {
-        synced = false;
-      }
+      console.warn('Telemetry poll error:', cloudErr);
     }
   }
 
   if (!synced) {
     const modeName = STATE.connectionMode === 'lan' ? 'LAN direct link' : 'Pantheon cloud bridge';
-    showBridgeOffline(`Bridge Offline: No telemetry from ${modeName}.`);
+    showBridgeOffline(`Telemetry Offline: No response from ${modeName}.`);
   }
 
   STATE.latency = Math.max(12, Math.floor(performance.now() - start));
@@ -450,6 +458,8 @@ function applyMoonrakerStatus(id, status) {
   let fanSpeed = 0.0;
   if (status.fan && status.fan.speed !== undefined) {
     fanSpeed = status.fan.speed;
+  } else if (status['fan_generic fanM106'] && status['fan_generic fanM106'].speed !== undefined) {
+    fanSpeed = status['fan_generic fanM106'].speed;
   } else if (status['fan_generic cooling_fan'] && status['fan_generic cooling_fan'].speed !== undefined) {
     fanSpeed = status['fan_generic cooling_fan'].speed;
   } else if (status['fan_generic part_fan'] && status['fan_generic part_fan'].speed !== undefined) {
@@ -467,58 +477,67 @@ function applyMoonrakerStatus(id, status) {
 }
 
 function handleBridgeTelemetry(bridgePrinters) {
-  const p1Data = bridgePrinters.p1;
-  const banner = document.getElementById('bridgeBanner');
-
-  if (!p1Data) {
-    showBridgeOffline('Bridge Offline: No telemetry from QIDI Q2 (192.168.1.124).');
+  if (!bridgePrinters || (!bridgePrinters.p1 && !bridgePrinters.p2)) {
+    showBridgeOffline('Bridge Offline: No telemetry data received.');
     return;
   }
 
-  const age = p1Data._age !== undefined ? p1Data._age : 0;
-  if (age > 20) {
+  const p1Data = bridgePrinters.p1;
+  const p2Data = bridgePrinters.p2;
+  const banner = document.getElementById('bridgeBanner');
+
+  // Check freshness based on active printer or whichever is available
+  const activeData = bridgePrinters[STATE.activePrinterId] || p1Data || p2Data;
+  const age = activeData && activeData._age !== undefined ? activeData._age : 0;
+
+  if (age > 25) {
     showBridgeOffline(`Bridge Stale: Last telemetry was ${age}s ago.`);
   } else {
     if (banner) banner.style.display = 'none';
-    updateNetworkBadge(true, `Cloud Bridge: Online (${age}s)`);
+    if (STATE.connectionMode === 'lan') {
+      updateNetworkBadge(true, `LAN Mode: Active (${age}s)`);
+    } else {
+      updateNetworkBadge(true, `Cloud Bridge: Online (${age}s)`);
+    }
   }
 
-  const p1 = STATE.printers.p1;
-  p1.online = p1Data.online !== false;
-  const st = (p1Data.state || 'ready').toLowerCase();
-  p1.state = st;
+  if (p1Data) {
+    const p1 = STATE.printers.p1;
+    p1.online = p1Data.online !== false;
+    const st = (p1Data.state || 'ready').toLowerCase();
+    p1.state = st;
 
-  if (st !== 'printing' && st !== 'paused') {
-    clearPrintCache('p1', false);
-  } else {
-    p1.filename = p1Data.filename || 'Unknown Print';
-    p1.currentLayer = p1Data.currentLayer || 0;
-    p1.totalLayer = p1Data.totalLayer || 0;
-    p1.progress = p1Data.progress !== undefined ? p1Data.progress : 0;
-    p1.elapsedSeconds = p1Data.elapsedSeconds || 0;
-    p1.totalDurationSeconds = p1Data.totalDurationSeconds || 0;
-    p1.filamentUsedMm = p1Data.filamentUsedMm || 0;
+    if (st !== 'printing' && st !== 'paused') {
+      clearPrintCache('p1', false);
+    } else {
+      p1.filename = p1Data.filename || 'Unknown Print';
+      p1.currentLayer = p1Data.currentLayer || 0;
+      p1.totalLayer = p1Data.totalLayer || 0;
+      p1.progress = p1Data.progress !== undefined ? p1Data.progress : 0;
+      p1.elapsedSeconds = p1Data.elapsedSeconds || 0;
+      p1.totalDurationSeconds = p1Data.totalDurationSeconds || 0;
+      p1.filamentUsedMm = p1Data.filamentUsedMm || 0;
+    }
+
+    if (p1Data.extruder) {
+      p1.extruder.actual = p1Data.extruder.actual ?? p1.extruder.actual;
+      p1.extruder.target = p1Data.extruder.target ?? p1.extruder.target;
+      p1.extruder.power = p1Data.extruder.power ?? p1.extruder.power;
+    }
+    if (p1Data.bed) {
+      p1.bed.actual = p1Data.bed.actual ?? p1.bed.actual;
+      p1.bed.target = p1Data.bed.target ?? p1.bed.target;
+      p1.bed.power = p1Data.bed.power ?? p1.bed.power;
+    }
+    if (p1Data.chamber) {
+      p1.chamber.actual = p1Data.chamber.actual ?? p1.chamber.actual;
+    }
+    if (p1Data.toolhead) {
+      Object.assign(p1.toolhead, p1Data.toolhead);
+    }
   }
 
-  if (p1Data.extruder) {
-    p1.extruder.actual = p1Data.extruder.actual ?? p1.extruder.actual;
-    p1.extruder.target = p1Data.extruder.target ?? p1.extruder.target;
-    p1.extruder.power = p1Data.extruder.power ?? p1.extruder.power;
-  }
-  if (p1Data.bed) {
-    p1.bed.actual = p1Data.bed.actual ?? p1.bed.actual;
-    p1.bed.target = p1Data.bed.target ?? p1.bed.target;
-    p1.bed.power = p1Data.bed.power ?? p1.bed.power;
-  }
-  if (p1Data.chamber) {
-    p1.chamber.actual = p1Data.chamber.actual ?? p1.chamber.actual;
-  }
-  if (p1Data.toolhead) {
-    Object.assign(p1.toolhead, p1Data.toolhead);
-  }
-
-  if (bridgePrinters.p2) {
-    const p2Data = bridgePrinters.p2;
+  if (p2Data) {
     const p2 = STATE.printers.p2;
     p2.online = p2Data.online !== false;
     const st2 = (p2Data.state || 'ready').toLowerCase();
@@ -541,14 +560,16 @@ function handleBridgeTelemetry(bridgePrinters) {
     if (p2Data.toolhead) Object.assign(p2.toolhead, p2Data.toolhead);
   }
 
-  // If off-network, dynamically load the active printer's snapshot URL
-  const activeData = bridgePrinters[STATE.activePrinterId];
-  if (!STATE.isLocalLAN && activeData && activeData.snapshot_url) {
-    loadSingleCloudSnapshot(activeData.snapshot_url);
-  } else if (!STATE.isLocalLAN && (!activeData || !activeData.online)) {
-    const img = document.getElementById('cameraStreamImg');
-    if (img) {
-      img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+  // Camera feed handling: In LAN mode or when verified on local LAN, preserve direct video stream!
+  // Only fall back to cloud snapshots if we are explicitly in cloud mode AND off-network.
+  if (STATE.connectionMode !== 'lan' && !STATE.isLocalLAN) {
+    if (activeData && activeData.snapshot_url) {
+      loadSingleCloudSnapshot(activeData.snapshot_url);
+    } else if (!activeData || !activeData.online) {
+      const img = document.getElementById('cameraStreamImg');
+      if (img) {
+        img.src = STATE.activePrinterId === 'p1' ? 'assets/NewPrinterIcon.jpeg' : 'assets/KK3.webp';
+      }
     }
   }
 }

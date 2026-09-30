@@ -6,13 +6,16 @@ echo   NEXUS 3D Bridge — Process & Connection Status
 echo ========================================================================
 echo.
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$procs = Get-WmiObject Win32_Process | Where-Object { $_.CommandLine -like '*bridge_daemon.py*' };" ^
-    "if ($procs) {" ^
-    "  Write-Host '[STATUS] Bridge Daemon is RUNNING (PID:' ($procs.ProcessId -join ', ') ')' -ForegroundColor Green;" ^
-    "} else {" ^
-    "  Write-Host '[STATUS] Bridge Daemon is NOT running.' -ForegroundColor Red;" ^
-    "}"
+set "FOUND_PID="
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":58921" ^| findstr "LISTENING"') do (
+    set "FOUND_PID=%%a"
+)
+
+if defined FOUND_PID (
+    echo [STATUS] Bridge Daemon is RUNNING (Port 58921 active, PID: %FOUND_PID%)
+) else (
+    echo [STATUS] Bridge Daemon is NOT running.
+)
 
 echo.
 echo Recent Bridge Log Entries (bridge.log):

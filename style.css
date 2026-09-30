@@ -4099,6 +4099,63 @@ body.light-theme .conn-mode-info-box p {
     max-width: 100% !important;
     box-sizing: border-box !important;
   }
+
+  /* ─── Hero Job Controls: Pause, Cancel, and E-STOP Mobile Optimization ─── */
+  .job-hero-card {
+    padding: 1rem 0.85rem !important;
+    gap: 1rem !important;
+  }
+
+  .job-actions-col {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    gap: 0.35rem !important;
+    margin-top: 0.35rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .job-actions-col .job-control-btn {
+    flex: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    padding: 0.45rem 0.2rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    gap: 0.3rem !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    margin-top: 0 !important;
+  }
+
+  .job-actions-col .job-control-btn svg {
+    width: 15px !important;
+    height: 15px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .job-actions-col .job-control-btn span {
+    font-size: 0.76rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1 !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  .fleet-card-footer {
+    display: grid !important;
+    grid-template-columns: 1fr auto auto !important;
+    gap: 0.35rem !important;
+    width: 100% !important;
+  }
+
+  .fleet-card-footer .btn-sm {
+    padding: 0.4rem 0.45rem !important;
+    font-size: 0.75rem !important;
+    min-height: 42px !important;
+    white-space: nowrap !important;
+  }
 }
 
 /* ──────────────────── IPHONE 16 / NARROW MOBILE (max-width: 430px) ──────────────────── */
@@ -4208,6 +4265,39 @@ body.light-theme .conn-mode-info-box p {
     height: 220px !important;
     padding: 0.6rem 0.7rem !important;
   }
+
+  /* ─── 430px (iPhone 16) Job Controls Fit ─── */
+  .job-hero-card {
+    padding: 0.85rem 0.65rem !important;
+  }
+
+  .job-actions-col {
+    gap: 0.25rem !important;
+  }
+
+  .job-actions-col .job-control-btn {
+    min-height: 44px !important;
+    padding: 0.4rem 0.15rem !important;
+    font-size: 0.72rem !important;
+    gap: 0.2rem !important;
+  }
+
+  .job-actions-col .job-control-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .job-actions-col .job-control-btn span {
+    font-size: 0.72rem !important;
+  }
+
+  .fleet-card-footer {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .fleet-card-footer .select-printer-btn {
+    grid-column: span 2 !important;
+  }
 }
 
 /* ──────────────────── COMPACT MOBILE / 360px VIEWPORT (max-width: 380px) ──────────────────── */
@@ -4299,6 +4389,27 @@ body.light-theme .conn-mode-info-box p {
     padding: 0 0.75rem !important;
     min-height: 44px !important;
     font-size: 0.8rem !important;
+  }
+
+  /* ─── 380px / 360px Compact Viewport Job Controls Fit ─── */
+  .job-actions-col {
+    gap: 0.2rem !important;
+  }
+
+  .job-actions-col .job-control-btn {
+    min-height: 42px !important;
+    padding: 0.35rem 0.1rem !important;
+    font-size: 0.68rem !important;
+    gap: 0.15rem !important;
+  }
+
+  .job-actions-col .job-control-btn svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .job-actions-col .job-control-btn span {
+    font-size: 0.68rem !important;
   }
 }
 

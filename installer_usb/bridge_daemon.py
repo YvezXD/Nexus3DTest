@@ -235,7 +235,7 @@ def query_moonraker(printer):
     objects = (
         "print_stats&virtual_sdcard&heater_bed&extruder&toolhead&display_status"
         "&heater_generic%20chamber&temperature_sensor%20Chamber_Thermal_Protection_Sensor"
-        "&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan"
+        "&fan&gcode_move&fan_generic%20cooling_fan&fan_generic%20part_fan&fan_generic%20fanM106"
     )
     query_path = f"/printer/objects/query?{objects}"
 
@@ -360,6 +360,8 @@ def query_moonraker(printer):
     fan_speed = 0.0
     if "fan" in status and status["fan"].get("speed") is not None:
         fan_speed = float(status["fan"]["speed"])
+    elif "fan_generic fanM106" in status and status["fan_generic fanM106"].get("speed") is not None:
+        fan_speed = float(status["fan_generic fanM106"]["speed"])
     elif "fan_generic cooling_fan" in status and status["fan_generic cooling_fan"].get("speed") is not None:
         fan_speed = float(status["fan_generic cooling_fan"]["speed"])
     elif "fan_generic part_fan" in status and status["fan_generic part_fan"].get("speed") is not None:
